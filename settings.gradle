@@ -26,4 +26,4 @@ include ':lib-net'
 include ':lib-base'
 include ':lib-material'
 
-include ':core-session-service'
+include ':core-player-service'
