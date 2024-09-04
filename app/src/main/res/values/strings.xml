@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">MeetMusic</string>
+
+    <string name="current_playlist_name">Current playlist</string>
+    <string name="open_player_content_description">Click to view your play list</string>
+    <string name="added_media_item_format">Added %1$s to playlist</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="play_button">Play</string>
+    <string name="waiting_for_metadata">Waiting for playlist to load…</string>
+    <string name="notification_permission_denied">
+    "Without notification access the app can't warn about failed background operations"</string>
+
+
+    <string name="action_settings">设置</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+
+</resources>
