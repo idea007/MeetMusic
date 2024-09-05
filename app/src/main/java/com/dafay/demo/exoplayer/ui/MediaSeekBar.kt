@@ -103,11 +103,14 @@ class MediaSeekBar : AppCompatSeekBar {
     private inner class MyPlayerListener : Player.Listener, ValueAnimator.AnimatorUpdateListener {
         override fun onEvents(player: Player, events: Player.Events) {
             super.onEvents(player, events)
+
+            if(events.contains(Player.EVENT_IS_PLAYING_CHANGED)){
+
+            }
+            dealStateChange(player.playbackState)
         }
 
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            super.onPlaybackStateChanged(playbackState)
-
+        private fun dealStateChange(playbackState: Int) {
             mMediaController ?: return
             // If there's an ongoing animation, stop it now.
             if (mProgressAnimator != null) {
@@ -135,9 +138,14 @@ class MediaSeekBar : AppCompatSeekBar {
                     mProgressAnimator!!.start()
                 }
             } else {
-
                 setProgress(mMediaController!!.currentPosition.toInt())
             }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            super.onPlaybackStateChanged(playbackState)
+
+            dealStateChange(playbackState)
         }
 
         @SuppressLint("UnsafeOptInUsageError")

@@ -94,7 +94,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="8dp"
-            android:text="00:00"
+            tools:text="00:00"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
 
@@ -110,7 +110,7 @@
                 android:id="@+id/btn_cycle_mode"
                 style="?attr/materialIconButtonStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="46dp"
+                android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
                 android:padding="12dp"
                 app:icon="@drawable/ic_shuffle_24dp"
@@ -147,7 +147,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
                 android:padding="3dp"
-                app:icon="@drawable/ic_play_circle_24dp"
+                app:icon="@drawable/ic_stop_circle_24dp"
                 app:iconSize="42dp"
                 app:iconTint="?attr/colorPrimary" />
 

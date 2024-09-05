@@ -21,10 +21,15 @@ import com.dafay.demo.exoplayer.R
 import com.dafay.demo.exoplayer.databinding.ActivityNowPlayingBinding
 import com.dafay.demo.exoplayer.glide.GlideApp
 import com.dafay.demo.exoplayer.page.main.feeds.CROSS_FADE_DURATION
+import com.dafay.demo.exoplayer.utils.toPlayerTime
 import com.dafay.demo.lab.base.base.BaseActivity
 import com.dafay.demo.lib.base.utils.debug
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import io.reactivex.Observable
+import io.reactivex.disposables.Disposable
+import java.util.concurrent.TimeUnit
+
 
 class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPlayingBinding::inflate) {
 
@@ -100,8 +105,8 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         val mediaMetadata = controller.mediaMetadata
         binding.tvSongName.text = mediaMetadata.title ?: ""
         binding.tvArtName.text = mediaMetadata.artist ?: ""
-        binding.tvDuration.text = controller.duration.toString()
-        binding.tvPosition.text = controller.currentPosition.toString()
+        binding.tvDuration.text = controller.duration.toPlayerTime()
+        binding.tvPosition.text = controller.currentPosition.toPlayerTime()
         updateTrackCover(mediaMetadata.artworkUri)
     }
 
@@ -124,6 +129,7 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
     private fun setController() {
         updateMediaMetadataUI()
         val controller = this.controller ?: return
+        startTimer()
         controller.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.contains(Player.EVENT_TRACKS_CHANGED)) {
@@ -144,8 +150,10 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         binding.btnPlay.setOnClickListener {
             if (!controller.isPlaying) {
                 controller.play()
+                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp)
             } else {
                 controller.pause()
+                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
             }
         }
 
@@ -197,6 +205,18 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         visualizer = null
     }
 
+
+    private var disposable: Disposable? = null
+    private fun startTimer(){
+        disposable?.dispose()
+        disposable=Observable.interval(1000, TimeUnit.MILLISECONDS)
+            .subscribe {
+                runOnUiThread {
+                    val controller = this.controller ?: return@runOnUiThread
+                    binding.tvPosition.text = controller.currentPosition.toPlayerTime()
+                }
+            }
+    }
 }
 
 
