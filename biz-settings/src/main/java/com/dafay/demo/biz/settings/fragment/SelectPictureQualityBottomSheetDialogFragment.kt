@@ -13,12 +13,7 @@ import com.example.demo.biz.base.storage.sp.SPUtils
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
-/**
- * @Des
- * @Author m1studio
- * @Date 2024/1/16
- * <a href=" ">相关链接</a>
- */
+
 class SelectPictureQualityBottomSheetDialogFragment : BottomSheetDialogFragment {
 
     private lateinit var binding: FragmentBottomSheetSelectPictureQualityBinding

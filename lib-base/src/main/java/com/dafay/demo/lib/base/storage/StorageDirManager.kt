@@ -8,9 +8,9 @@ import java.io.File
 /**
  * @description: 文件缓存管理
  * 1.注意 SqLite 和 缓存文件要同步，app 卸载一起被清除
- * @Author: lipengfei
+ * @Author: dafay
  * @Date: 2023/4/3
- * @Last Modified by: lipengfei
+ * @Last Modified by: dafay
  * @Last Modified time: 2023/4/3
  */
 class StorageDirManager {

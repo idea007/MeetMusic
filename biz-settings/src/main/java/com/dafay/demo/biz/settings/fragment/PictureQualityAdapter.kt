@@ -13,7 +13,7 @@ import com.google.android.material.color.MaterialColors
 
 /**
  * @Des
- * @Author lipengfei
+ * @Author dafay
  * @Date 2024/1/17
  */
 class PictureQualityAdapter : BaseAdapter<PhotoQuality> {

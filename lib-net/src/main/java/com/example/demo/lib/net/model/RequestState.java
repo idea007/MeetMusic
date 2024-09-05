@@ -8,7 +8,7 @@ package com.example.demo.lib.net.model;
  * ERROR    失败
  * NO_DATA    没有数据
  * NO_MORE_DATA     没有更多数据
- * @Author lipengfei
+ * @Author dafay
  * @Date 2023/5/20 15:50
  */
 public enum RequestState {

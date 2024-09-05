@@ -4,7 +4,7 @@ import okhttp3.Interceptor
 
 /**
  * @Des 网络请求配置
- * @Author lipengfei
+ * @Author dafay
  * @Date 2023/11/27 18:06
  */
 object HttpConfigManager {

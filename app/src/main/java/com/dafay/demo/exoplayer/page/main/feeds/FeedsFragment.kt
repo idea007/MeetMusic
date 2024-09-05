@@ -1,32 +1,26 @@
 package com.dafay.demo.exoplayer.page.main.feeds
 
-import android.annotation.SuppressLint
 import android.content.ComponentName
-import android.os.Bundle
 import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaBrowser
-import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.SessionToken
-import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.arasthel.spannedgridlayoutmanager.SpanSize
 import com.arasthel.spannedgridlayoutmanager.SpannedGridLayoutManager
+import com.dafay.demo.data.source.data.Result
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.databinding.FragmentFeedsBinding
-import com.dafay.demo.exoplayer.page.list.PlayableFolderActivity
 import com.dafay.demo.lab.base.base.BaseFragment
+import com.dafay.demo.lib.base.ui.recy.RecyclerViewInfiniteScrollListener
+import com.dafay.demo.lib.base.utils.HandlerUtils
 import com.dafay.demo.lib.base.utils.debug
 import com.dafay.demo.lib.base.utils.dp2px
 import com.example.demo.biz.base.widgets.GridMarginDecoration
 import com.google.android.material.color.MaterialColors
 import com.google.common.util.concurrent.ListenableFuture
-import com.dafay.demo.data.source.data.Result
-import com.dafay.demo.lib.base.ui.recy.RecyclerViewInfiniteScrollListener
-import com.dafay.demo.lib.base.utils.HandlerUtils
 
 class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::inflate) {
 

@@ -46,8 +46,7 @@ import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSession.ControllerInfo
 import com.dafay.demo.data.source.data.http.CommonInterceptor
-import com.dafay.demo.lib.base.utils.debug
-import com.dafay.demo.lib.base.utils.errorMsg
+import com.dafay.demo.lib.base.utils.err
 import com.example.demo.lib.net.HttpConfigManager
 
 open class DemoPlaybackService : MediaLibraryService() {
@@ -122,8 +121,6 @@ open class DemoPlaybackService : MediaLibraryService() {
         }
     }
 
-    // MediaSession.setSessionActivity
-    // MediaSessionService.clearListener
     @OptIn(UnstableApi::class)
     override fun onDestroy() {
         getBackStackedActivity()?.let { mediaLibrarySession.setSessionActivity(it) }
@@ -137,7 +134,6 @@ open class DemoPlaybackService : MediaLibraryService() {
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializeSessionAndPlayer() {
-
         fftAudioProcessor.listener = object : FFTAudioProcessor.FFTListener {
             override fun onFFTReady(sampleRateHz: Int, channelCount: Int, fft: FloatArray) {
                 Log.w("FFTAudio", "onFFTReady(${sampleRateHz} ${channelCount} ${fft.size})")
@@ -151,7 +147,7 @@ open class DemoPlaybackService : MediaLibraryService() {
                         if (e is DeadObjectException) {
                             ExtraService.receiveMessageCallbacks.remove(key)
                         }
-                        errorMsg(e.message ?: "")
+                        err(e.message ?: "")
                     }
                 }
             }
@@ -204,14 +200,13 @@ open class DemoPlaybackService : MediaLibraryService() {
                 .build()
         player.addAnalyticsListener(EventLogger())
 
-
         mediaLibrarySession =
             MediaLibrarySession.Builder(this, player, createLibrarySessionCallback())
                 .also { builder -> getSingleTopActivity()?.let { builder.setSessionActivity(it) } }
                 .build()
     }
 
-    @OptIn(UnstableApi::class) // MediaSessionService.Listener
+    @OptIn(UnstableApi::class)
     private inner class MediaSessionServiceListener : Listener {
 
         /**

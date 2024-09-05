@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * @ClassName LiveDataPack
  * @Des 数据包
- * @Author lipengfei
+ * @Author dafay
  * @Date 2023/5/20 16:00
  */
 public class LiveDataPack<T> {

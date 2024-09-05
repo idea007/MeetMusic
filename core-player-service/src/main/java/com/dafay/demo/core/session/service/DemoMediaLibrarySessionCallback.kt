@@ -186,7 +186,6 @@ open class DemoMediaLibrarySessionCallback(context: Context) : MediaLibraryServi
     private fun resolveMediaItems(mediaItems: List<MediaItem>): List<MediaItem> {
         val playlist = mutableListOf<MediaItem>()
         mediaItems.forEach { mediaItem ->
-
             val treeItem = cacheMediaItemMap[mediaItem.mediaId]
             if (treeItem != null) {
                 val metadata = treeItem.mediaMetadata.buildUpon().populate(mediaItem.mediaMetadata).build()

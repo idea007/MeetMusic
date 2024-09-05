@@ -8,7 +8,7 @@ import com.dafay.demo.biz.settings.databinding.LayoutSettingsItemUniteViewBindin
 
 /**
  * @Des 设置页通用 item
- * @Author m1studio
+ * @Author dafay
  * @Date 2024/1/7
  * <a href=" ">相关链接</a>
  */

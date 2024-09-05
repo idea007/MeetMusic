@@ -2,7 +2,7 @@ package com.dafay.demo.exoplayer.glide;
 
 /**
  * @Des
- * @Author lipengfei
+ * @Author dafay
  * @Date 2024/1/29
  */
 
@@ -25,7 +25,6 @@ import okhttp3.OkHttpClient;
 
 @GlideModule
 public class MyGlideModule extends AppGlideModule {
-
 
     @Override
     public void applyOptions(Context context, GlideBuilder builder) {

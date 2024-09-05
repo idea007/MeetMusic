@@ -15,7 +15,7 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.dafay.demo.aidl.callback.ReceiveMessageCallback
-import com.dafay.demo.aidl.proxy.TestServiceProxy
+import com.dafay.demo.aidl.proxy.ExtraSessionServiceProxy
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.R
 import com.dafay.demo.exoplayer.databinding.ActivityNowPlayingBinding
@@ -53,8 +53,8 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
     override fun onStart() {
         super.onStart()
         initializeController()
-        TestServiceProxy.bindService()
-        TestServiceProxy.registerReceiverListener(object : ReceiveMessageCallback.Stub() {
+        ExtraSessionServiceProxy.bindService()
+        ExtraSessionServiceProxy.registerReceiverListener(object : ReceiveMessageCallback.Stub() {
             override fun onFFTReady(sampleRateHz: Int, channelCount: Int, fft: FloatArray?) {
                 debug("onFFTReady(${sampleRateHz} ${channelCount} ${fft?.size})")
                 binding.fftBandView.onFFT(fft ?: floatArrayOf())

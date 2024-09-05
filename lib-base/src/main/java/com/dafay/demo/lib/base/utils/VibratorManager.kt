@@ -12,7 +12,7 @@ import android.provider.Settings
 
 /**
  * @Des vibrator 管理类
- * @Author lipengfei
+ * @Author dafay
  * @Date 2024/1/22
  */
 object VibratorManager {

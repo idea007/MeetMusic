@@ -3,7 +3,7 @@ package com.dafay.demo.aidl.proxy
 import com.dafay.demo.aidl.callback.ReceiveMessageCallback
 
 
-object TestServiceProxy : BaseServiceConnect() {
+object ExtraSessionServiceProxy : BaseServiceConnect() {
 
     @Throws(RuntimeException::class)
     private fun checkServiceConnected() {

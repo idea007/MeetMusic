@@ -40,11 +40,11 @@ fun Any.debug(message: String, tr: Throwable) {
     Log.d(this::class.java.simpleName, appendPrefix(message), tr)
 }
 
-fun Any.errorMsg(message: String?) {
+fun Any.err(message: String?) {
     Log.e(this::class.java.simpleName, appendPrefix(message?:""))
 }
 
-fun Any.errorMsg(message: String, tr: Throwable?) {
+fun Any.err(message: String, tr: Throwable?) {
     Log.e(this::class.java.simpleName, appendPrefix(message), tr)
 }
 

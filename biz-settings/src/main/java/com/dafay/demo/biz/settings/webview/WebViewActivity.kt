@@ -10,7 +10,7 @@ import android.widget.Toast
 import com.dafay.demo.biz.settings.R
 import com.dafay.demo.biz.settings.base.BaseThemeActivity
 import com.dafay.demo.biz.settings.databinding.ActivityWebViewBinding
-import com.dafay.demo.lib.base.utils.errorMsg
+import com.dafay.demo.lib.base.utils.err
 
 class WebViewActivity : BaseThemeActivity<ActivityWebViewBinding>(ActivityWebViewBinding::inflate) {
 
@@ -65,7 +65,7 @@ class WebViewActivity : BaseThemeActivity<ActivityWebViewBinding>(ActivityWebVie
                         view.context.startActivity(intent)
                         true
                     } catch (e: Exception) {
-                        errorMsg("shouldOverrideUrlLoading Exception", e)
+                        err("shouldOverrideUrlLoading Exception", e)
                         true
                     }
                 }

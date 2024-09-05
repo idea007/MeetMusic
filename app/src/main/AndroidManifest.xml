@@ -38,10 +38,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".page.list.PlayableFolderActivity"
-            android:exported="true" />
-
         <service
             android:name=".PlaybackService"
             android:exported="true"
