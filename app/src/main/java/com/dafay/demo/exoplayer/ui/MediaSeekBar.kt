@@ -90,6 +90,7 @@ class MediaSeekBar : AppCompatSeekBar {
             playerListener = null
         }
         mMediaController = mediaController
+        playerListener!!.dealStateChange(mediaController!!.isPlaying)
     }
 
     fun disconnectController() {
@@ -101,33 +102,24 @@ class MediaSeekBar : AppCompatSeekBar {
     }
 
     private inner class MyPlayerListener : Player.Listener, ValueAnimator.AnimatorUpdateListener {
-        override fun onEvents(player: Player, events: Player.Events) {
-            super.onEvents(player, events)
-
-            if(events.contains(Player.EVENT_IS_PLAYING_CHANGED)){
-
-            }
-            dealStateChange(player.playbackState)
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            super.onIsPlayingChanged(isPlaying)
+            dealStateChange(isPlaying)
         }
 
-        private fun dealStateChange(playbackState: Int) {
-            mMediaController ?: return
-            // If there's an ongoing animation, stop it now.
-            if (mProgressAnimator != null) {
-                mProgressAnimator!!.cancel()
-                mProgressAnimator = null
-            }
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            super.onPlaybackStateChanged(playbackState)
+            dealStateChange(playbackState== PlaybackState.STATE_PLAYING)
+        }
 
+         fun dealStateChange(isPlaying: Boolean) {
+            mMediaController ?: return
+            mProgressAnimator?.cancel()
+            mProgressAnimator=null
             val progress = mMediaController!!.currentPosition.toInt()
             setProgress(progress)
-
-            // If the media is playing then the seekbar should follow it, and the easiest
-            // way to do that is to create a ValueAnimator to update it so the bar reaches
-            // the end of the media the same time as playback gets there (or close enough).
-
-            if (playbackState == PlaybackState.STATE_PLAYING) {
+            if (isPlaying) {
                 val timeToEnd = (max - progress)
-
                 if (timeToEnd > 0) {
                     mProgressAnimator?.cancel()
                     mProgressAnimator = ValueAnimator.ofInt(progress, max)
@@ -141,19 +133,6 @@ class MediaSeekBar : AppCompatSeekBar {
                 setProgress(mMediaController!!.currentPosition.toInt())
             }
         }
-
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            super.onPlaybackStateChanged(playbackState)
-
-            dealStateChange(playbackState)
-        }
-
-        @SuppressLint("UnsafeOptInUsageError")
-        override fun onMetadata(metadata: Metadata) {
-            super.onMetadata(metadata)
-        }
-
-
         override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
             super.onMediaMetadataChanged(mediaMetadata)
             mMediaController?.let {
@@ -161,15 +140,6 @@ class MediaSeekBar : AppCompatSeekBar {
                 setMax(max)
                 onPlaybackStateChanged(it.playbackState)
             }
-
-        }
-
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            super.onMediaItemTransition(mediaItem, reason)
-        }
-
-        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            super.onShuffleModeEnabledChanged(shuffleModeEnabled)
         }
 
         override fun onAnimationUpdate(valueAnimator: ValueAnimator) {

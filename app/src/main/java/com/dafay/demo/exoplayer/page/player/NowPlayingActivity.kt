@@ -7,7 +7,11 @@ import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.view.Menu
 import android.view.MenuItem
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Metadata
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -38,6 +42,7 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         get() = if (controllerFuture.isDone && !controllerFuture.isCancelled) controllerFuture.get() else null
 
     private var visualizer: Visualizer? = null
+    private var disposable: Disposable? = null
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
@@ -57,11 +62,12 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
 
     override fun onStart() {
         super.onStart()
+        debug("onStart()")
         initializeController()
         ExtraSessionServiceProxy.bindService()
         ExtraSessionServiceProxy.registerReceiverListener(object : ReceiveMessageCallback.Stub() {
             override fun onFFTReady(sampleRateHz: Int, channelCount: Int, fft: FloatArray?) {
-                debug("onFFTReady(${sampleRateHz} ${channelCount} ${fft?.size})")
+//                debug("onFFTReady(${sampleRateHz} ${channelCount} ${fft?.size})")
                 binding.fftBandView.onFFT(fft ?: floatArrayOf())
             }
         })
@@ -70,6 +76,50 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
     override fun initViews() {
         super.initViews()
         initToolbar()
+    }
+
+
+    private fun initToolbar() {
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setDisplayShowHomeEnabled(true)
+        binding.toolbar.setNavigationOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
+        }
+    }
+
+    override fun bindListener() {
+        super.bindListener()
+
+        binding.btnPlay.setOnClickListener {
+            val controller = this.controller ?: return@setOnClickListener
+            if (!controller.isPlaying) {
+                controller.play()
+//                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp)
+            } else {
+                controller.pause()
+//                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
+            }
+        }
+
+        binding.btnSkipNext.setOnClickListener {
+            val controller = this.controller ?: return@setOnClickListener
+            controller.seekToNext()
+        }
+
+        binding.btnSkipPrevious.setOnClickListener {
+            val controller = this.controller ?: return@setOnClickListener
+            controller.seekToPrevious()
+        }
+
+    }
+
+    private fun updatePlayBtnIcon(isPlaying:Boolean){
+        if (isPlaying) {
+            binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp)
+        } else {
+            binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
+        }
     }
 
     private fun updateTrackCover(artworkUri: Uri?) {
@@ -85,21 +135,13 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
             .into(binding.ivImg)
     }
 
-    private fun initToolbar() {
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setDisplayShowHomeEnabled(true)
-        binding.toolbar.setNavigationOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
-        }
-    }
 
     // 更新歌曲信息
     private fun updateMediaMetadataUI() {
         val controller = this.controller ?: return
         if (controller == null || controller.mediaItemCount == 0) {
-            binding.tvSongName.text = "加载中..."
-            binding.tvArtName.text = "未加载"
+            binding.tvSongName.text = "..."
+            binding.tvArtName.text = ""
             return
         }
         val mediaMetadata = controller.mediaMetadata
@@ -108,11 +150,7 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         binding.tvDuration.text = controller.duration.toPlayerTime()
         binding.tvPosition.text = controller.currentPosition.toPlayerTime()
         updateTrackCover(mediaMetadata.artworkUri)
-    }
-
-    override fun onStop() {
-        super.onStop()
-        MediaController.releaseFuture(controllerFuture)
+        updatePlayBtnIcon(controller.isPlaying)
     }
 
     private fun initializeController() {
@@ -120,58 +158,101 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
             MediaController.Builder(
                 this,
                 SessionToken(this, ComponentName(this, PlaybackService::class.java)),
-            )
-                .buildAsync()
+            ).buildAsync()
         // 等待连接
-        controllerFuture.addListener({ setController() }, MoreExecutors.directExecutor())
+        controllerFuture.addListener({
+            debug("updateMediaMetadataUI")
+            updateMediaMetadataUI()
+            setController()
+        }, MoreExecutors.directExecutor())
+    }
+
+    private val controllerListener=object : Player.Listener{
+        override fun onEvents(player: Player, events: Player.Events) {
+
+            if (events.contains(Player.EVENT_TRACKS_CHANGED)) {
+                debug("addListener onEvents EVENT_TRACKS_CHANGED")
+            }
+            if (events.contains(Player.EVENT_TIMELINE_CHANGED)) {
+                debug("addListener onEvents EVENT_TIMELINE_CHANGED")
+            }
+            if (events.contains(Player.EVENT_MEDIA_METADATA_CHANGED)) {
+                debug("addListener onEvents EVENT_MEDIA_METADATA_CHANGED")
+                updateMediaMetadataUI()
+            }
+            if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
+                debug("addListener onEvents EVENT_MEDIA_ITEM_TRANSITION")
+            }
+            if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) {
+                debug("addListener onEvents EVENT_IS_PLAYING_CHANGED")
+
+            }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            super.onPlaybackStateChanged(playbackState)
+            debug("addListener onPlaybackStateChanged ${playbackState}")
+        }
+
+        override fun onAudioAttributesChanged(audioAttributes: AudioAttributes) {
+            super.onAudioAttributesChanged(audioAttributes)
+            debug("onAudioAttributesChanged audioAttributes ${audioAttributes}")
+        }
+
+        @SuppressLint("UnsafeOptInUsageError")
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            debug("onAudioSessionIdChanged audioSessionId=$audioSessionId")
+            initializeVisualizer(audioSessionId)
+        }
+
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+            super.onMediaMetadataChanged(mediaMetadata)
+            debug("onMediaMetadataChanged mediaMetadata=${mediaMetadata}")
+        }
+
+        @SuppressLint("UnsafeOptInUsageError")
+        override fun onMetadata(metadata: Metadata) {
+            super.onMetadata(metadata)
+            debug("onMetadata onMetadata=${metadata.toString()}")
+        }
+
+        override fun onPlaylistMetadataChanged(mediaMetadata: MediaMetadata) {
+            super.onPlaylistMetadataChanged(mediaMetadata)
+            debug("onPlaylistMetadataChanged${mediaMetadata}")
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            super.onShuffleModeEnabledChanged(shuffleModeEnabled)
+            debug("onShuffleModeEnabledChanged shuffleModeEnabled=${shuffleModeEnabled}")
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            super.onRepeatModeChanged(repeatMode)
+            debug("onRepeatModeChanged ${repeatMode}")
+        }
+
+        override fun onIsLoadingChanged(isLoading: Boolean) {
+            super.onIsLoadingChanged(isLoading)
+            debug("onIsLoadingChanged ${isLoading}")
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            super.onIsPlayingChanged(isPlaying)
+            debug("onIsPlayingChanged ${isPlaying}")
+            updatePlayBtnIcon(isPlaying)
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+            super.onTracksChanged(tracks)
+            debug("onTracksChanged ${tracks}")
+        }
     }
 
     private fun setController() {
-        updateMediaMetadataUI()
         val controller = this.controller ?: return
         startTimer()
-        controller.addListener(object : Player.Listener {
-            override fun onEvents(player: Player, events: Player.Events) {
-                if (events.contains(Player.EVENT_TRACKS_CHANGED)) {
-                }
-                if (events.contains(Player.EVENT_TIMELINE_CHANGED)) {
-
-                }
-                if (events.contains(Player.EVENT_MEDIA_METADATA_CHANGED)) {
-                    updateMediaMetadataUI()
-                }
-                if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
-
-                }
-            }
-        })
+        controller.addListener(controllerListener)
         binding.sbSeek.setMediaController(controller)
-
-        binding.btnPlay.setOnClickListener {
-            if (!controller.isPlaying) {
-                controller.play()
-                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp)
-            } else {
-                controller.pause()
-                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
-            }
-        }
-
-        binding.btnSkipNext.setOnClickListener {
-            controller.seekToNext()
-        }
-
-        binding.btnSkipPrevious.setOnClickListener {
-            controller.seekToPrevious()
-        }
-
-        controller.addListener(object : Player.Listener {
-            @SuppressLint("UnsafeOptInUsageError")
-            override fun onAudioSessionIdChanged(audioSessionId: Int) {
-                debug("onAudioSessionIdChanged audioSessionId=$audioSessionId")
-                initializeVisualizer(audioSessionId)
-            }
-        })
     }
 
     private fun initializeVisualizer(audioSessionId: Int) {
@@ -205,17 +286,23 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         visualizer = null
     }
 
-
-    private var disposable: Disposable? = null
-    private fun startTimer(){
+    private fun startTimer() {
         disposable?.dispose()
-        disposable=Observable.interval(1000, TimeUnit.MILLISECONDS)
+        disposable = Observable.interval(1000, TimeUnit.MILLISECONDS)
             .subscribe {
                 runOnUiThread {
                     val controller = this.controller ?: return@runOnUiThread
                     binding.tvPosition.text = controller.currentPosition.toPlayerTime()
                 }
             }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        debug("onStop()")
+        disposable?.dispose()
+        MediaController.releaseFuture(controllerFuture)
+        binding.sbSeek.disconnectController()
     }
 }
 

@@ -136,7 +136,7 @@ open class DemoPlaybackService : MediaLibraryService() {
     private fun initializeSessionAndPlayer() {
         fftAudioProcessor.listener = object : FFTAudioProcessor.FFTListener {
             override fun onFFTReady(sampleRateHz: Int, channelCount: Int, fft: FloatArray) {
-                Log.w("FFTAudio", "onFFTReady(${sampleRateHz} ${channelCount} ${fft.size})")
+//                Log.w("FFTAudio", "onFFTReady(${sampleRateHz} ${channelCount} ${fft.size})")
                 val iterator: Iterator<Int> = ExtraService.receiveMessageCallbacks.keys.toList().iterator()
                 while (iterator.hasNext()) {
                     val key = iterator.next()
