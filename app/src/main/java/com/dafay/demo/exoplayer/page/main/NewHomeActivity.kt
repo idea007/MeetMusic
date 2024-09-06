@@ -1,11 +1,12 @@
 package com.dafay.demo.exoplayer.page.main
 
+import com.dafay.demo.biz.settings.base.BaseThemeActivity
 import com.dafay.demo.exoplayer.R
 import com.dafay.demo.exoplayer.databinding.ActivityNewHomeBinding
 import com.dafay.demo.exoplayer.page.main.feeds.FeedsFragment
 import com.dafay.demo.lab.base.base.BaseActivity
 
-class NewHomeActivity : BaseActivity<ActivityNewHomeBinding>(ActivityNewHomeBinding::inflate) {
+class NewHomeActivity : BaseThemeActivity<ActivityNewHomeBinding>(ActivityNewHomeBinding::inflate) {
 
     override fun initViews() {
         supportFragmentManager.beginTransaction()

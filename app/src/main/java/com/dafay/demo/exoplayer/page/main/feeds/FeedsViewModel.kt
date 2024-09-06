@@ -2,19 +2,15 @@ package com.dafay.demo.exoplayer.page.main.feeds
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.MediaLibraryService
-import kotlinx.coroutines.async
 import com.dafay.demo.data.source.data.Result
-import io.reactivex.Observable
-import kotlinx.coroutines.launch
+import com.example.demo.meetsplash.data.model.PAGE
 import java.util.concurrent.Executors
+import kotlin.random.Random
 
 /**
  * @Des
@@ -23,8 +19,7 @@ import java.util.concurrent.Executors
  * <a href=" ">相关链接</a>
  */
 class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
-    private var curPageIndex = 1
-
+    private var curPageIndex = 0
     val refreshMediaItemsLiveData = MutableLiveData<Result<List<MediaItem>>>()
     val loadmoreMediaItemsLiveData = MutableLiveData<Result<List<MediaItem>>>()
 
@@ -33,8 +28,8 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
             return
         }
         refreshMediaItemsLiveData.postValue(Result.Loading)
-        curPageIndex = 0
-        query(0, 30, refreshMediaItemsLiveData)
+        curPageIndex = Random.nextInt(0,100)*100
+        query(curPageIndex, PAGE.PAGE_SIZE_THIRTY, refreshMediaItemsLiveData)
     }
 
 
@@ -43,7 +38,7 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
             return
         }
         loadmoreMediaItemsLiveData.postValue(Result.Loading)
-        query(curPageIndex, 30, loadmoreMediaItemsLiveData)
+        query(curPageIndex, PAGE.PAGE_SIZE_THIRTY, loadmoreMediaItemsLiveData)
     }
 
 
@@ -79,5 +74,4 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
             Executors.newSingleThreadExecutor()
         )
     }
-
 }

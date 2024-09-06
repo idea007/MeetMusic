@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.media.audiofx.Visualizer
 import android.net.Uri
+import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
 import androidx.media3.common.AudioAttributes
@@ -20,22 +21,25 @@ import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.dafay.demo.aidl.callback.ReceiveMessageCallback
 import com.dafay.demo.aidl.proxy.ExtraSessionServiceProxy
+import com.dafay.demo.biz.settings.base.BaseThemeActivity
+import com.dafay.demo.biz.settings.helper.CommonMessage
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.R
 import com.dafay.demo.exoplayer.databinding.ActivityNowPlayingBinding
 import com.dafay.demo.exoplayer.glide.GlideApp
 import com.dafay.demo.exoplayer.page.main.feeds.CROSS_FADE_DURATION
 import com.dafay.demo.exoplayer.utils.toPlayerTime
-import com.dafay.demo.lab.base.base.BaseActivity
+import com.dafay.demo.lib.base.utils.RxBus
 import com.dafay.demo.lib.base.utils.debug
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import io.reactivex.Observable
+import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import java.util.concurrent.TimeUnit
 
 
-class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPlayingBinding::inflate) {
+class NowPlayingActivity : BaseThemeActivity<ActivityNowPlayingBinding>(ActivityNowPlayingBinding::inflate) {
 
     private lateinit var controllerFuture: ListenableFuture<MediaController>
     private val controller: MediaController?
@@ -67,7 +71,6 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         ExtraSessionServiceProxy.bindService()
         ExtraSessionServiceProxy.registerReceiverListener(object : ReceiveMessageCallback.Stub() {
             override fun onFFTReady(sampleRateHz: Int, channelCount: Int, fft: FloatArray?) {
-//                debug("onFFTReady(${sampleRateHz} ${channelCount} ${fft?.size})")
                 binding.fftBandView.onFFT(fft ?: floatArrayOf())
             }
         })
@@ -89,37 +92,41 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
     }
 
     override fun bindListener() {
-        super.bindListener()
-
         binding.btnPlay.setOnClickListener {
-            val controller = this.controller ?: return@setOnClickListener
-            if (!controller.isPlaying) {
-                controller.play()
-//                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp)
-            } else {
-                controller.pause()
-//                binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
+            controller?.let {
+                if (it.isPlaying) {
+                    it.pause()
+                } else {
+                    it.play()
+                }
             }
         }
 
         binding.btnSkipNext.setOnClickListener {
-            val controller = this.controller ?: return@setOnClickListener
-            controller.seekToNext()
+            controller?.seekToNext()
         }
 
         binding.btnSkipPrevious.setOnClickListener {
-            val controller = this.controller ?: return@setOnClickListener
-            controller.seekToPrevious()
+            controller?.seekToPrevious()
         }
-
     }
 
-    private fun updatePlayBtnIcon(isPlaying:Boolean){
-        if (isPlaying) {
-            binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp)
-        } else {
-            binding.btnPlay.setIconResource(com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
-        }
+    @SuppressLint("CheckResult")
+    override fun initObserver() {
+        RxBus.toObservable(CommonMessage::class.java).observeOn(AndroidSchedulers.mainThread())
+            .subscribe({
+                when (it.type) {
+                    CommonMessage.Type.CHANGE_THEME -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            this.recreate()
+                        }
+                    }
+                }
+            })
+    }
+
+    private fun updatePlayBtnIcon(isPlaying: Boolean) {
+        binding.btnPlay.setIconResource(if (isPlaying) com.dafay.demo.lib.material.R.drawable.ic_stop_circle_24dp else com.dafay.demo.lib.material.R.drawable.ic_play_circle_24dp)
     }
 
     private fun updateTrackCover(artworkUri: Uri?) {
@@ -136,10 +143,12 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
     }
 
 
-    // 更新歌曲信息
+    /**
+     * update media info
+     */
     private fun updateMediaMetadataUI() {
         val controller = this.controller ?: return
-        if (controller == null || controller.mediaItemCount == 0) {
+        if (controller.mediaItemCount == 0) {
             binding.tvSongName.text = "..."
             binding.tvArtName.text = ""
             return
@@ -155,11 +164,9 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
 
     private fun initializeController() {
         controllerFuture =
-            MediaController.Builder(
-                this,
-                SessionToken(this, ComponentName(this, PlaybackService::class.java)),
-            ).buildAsync()
-        // 等待连接
+            MediaController.Builder(this, SessionToken(this, ComponentName(this, PlaybackService::class.java)))
+                .buildAsync()
+        // wait for controller to be ready
         controllerFuture.addListener({
             debug("updateMediaMetadataUI")
             updateMediaMetadataUI()
@@ -167,7 +174,7 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
         }, MoreExecutors.directExecutor())
     }
 
-    private val controllerListener=object : Player.Listener{
+    private val controllerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
 
             if (events.contains(Player.EVENT_TRACKS_CHANGED)) {
@@ -185,7 +192,6 @@ class NowPlayingActivity : BaseActivity<ActivityNowPlayingBinding>(ActivityNowPl
             }
             if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) {
                 debug("addListener onEvents EVENT_IS_PLAYING_CHANGED")
-
             }
         }
 

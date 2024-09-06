@@ -7,7 +7,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.util.AttributeSet
 import android.view.View
+import com.dafay.demo.biz.settings.utils.ResUtil
 import com.dafay.demo.core.session.service.FFTAudioProcessor
+import com.dafay.demo.lib.base.utils.dp2px
 import java.lang.System.arraycopy
 import kotlin.math.cos
 import kotlin.math.floor
@@ -37,10 +39,29 @@ class FFTBandView @JvmOverloads constructor(
     private val maxConst = 25_000 // Reference max value for accum magnitude
 
     private val fft: FloatArray = FloatArray(size)
-    private val paintBandsFill = Paint()
-    private val paintBands = Paint()
-    private val paintAvg = Paint()
-    private val paintPath = Paint()
+    private val paintBandsFill = Paint().apply {
+        this.color = ResUtil.getColorAttr(context, com.google.android.material.R.attr.colorPrimaryContainer)
+        this.style = Paint.Style.FILL
+        this.alpha= 70
+    }
+    private val paintBands = Paint().apply {
+        this.color = ResUtil.getColorAttr(context, com.google.android.material.R.attr.colorSecondary)
+        this.strokeWidth = 0.5f
+        this.alpha= 128
+        this.style = Paint.Style.STROKE
+    }
+    private val paintAvg = Paint().apply {
+        this.color = Color.TRANSPARENT
+        this.strokeWidth = 2f
+        this.style = Paint.Style.STROKE
+    }
+    private val paintPath = Paint().apply {
+        this.color = ResUtil.getColorAttr(context, com.google.android.material.R.attr.colorPrimary)
+        this.strokeWidth = 1.dp2px.toFloat()
+        this.alpha=0
+        this.isAntiAlias = true
+        this.style = Paint.Style.STROKE
+    }
 
     // We average out the values over 3 occurences (plus the current one), so big jumps are smoothed out
     private val smoothingFactor = 3
@@ -52,21 +73,31 @@ class FFTBandView @JvmOverloads constructor(
 
     init {
         keepScreenOn = true
-        paintBandsFill.color = Color.parseColor("#20FF00FF")
-        paintBandsFill.style = Paint.Style.FILL
+//        paintBandsFill.color = ResUtil.getColorAttr(context, com.google.android.material.R.attr.colorPrimaryContainer)
+//        paintBandsFill.style = Paint.Style.FILL
+//        paintBandsFill.alpha= 70
+//
+//        paintBands.color = ResUtil.getColorAttr(context, com.google.android.material.R.attr.colorSecondary)
+//        paintBands.strokeWidth = 0.5f
+//        paintBands.alpha= 128
+//        paintBands.style = Paint.Style.STROKE
+//
+//        paintAvg.color = Color.TRANSPARENT
+//        paintAvg.strokeWidth = 2f
+//        paintAvg.style = Paint.Style.STROKE
+//
+//        paintPath.color = ResUtil.getColorAttr(context, com.google.android.material.R.attr.colorPrimary)
+//        paintPath.strokeWidth = 1.dp2px.toFloat()
+//        paintPath.alpha=128
+//        paintPath.isAntiAlias = true
+//        paintPath.style = Paint.Style.STROKE
+    }
 
-        paintBands.color = Color.parseColor("#6000FFFF")
-        paintBands.strokeWidth = 1f
-        paintBands.style = Paint.Style.STROKE
-
-        paintAvg.color = Color.parseColor("#1976d2")
-        paintAvg.strokeWidth = 2f
-        paintAvg.style = Paint.Style.STROKE
-
-        paintPath.color = Color.WHITE
-        paintPath.strokeWidth = 8f
-        paintPath.isAntiAlias = true
-        paintPath.style = Paint.Style.STROKE
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        drawAudio(canvas)
+        // By calling invalidate, we request a redraw. See https://github.com/dzolnai/ExoVisualizer/issues/2
+        invalidate()
     }
 
     private fun drawAudio(canvas: Canvas) {
@@ -184,12 +215,5 @@ class FFTBandView @JvmOverloads constructor(
             // By calling invalidate, we request a redraw.
             invalidate()
         }
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        drawAudio(canvas)
-        // By calling invalidate, we request a redraw. See https://github.com/dzolnai/ExoVisualizer/issues/2
-        invalidate()
     }
 }
