@@ -33,6 +33,10 @@ open class TwoWaySpannedGridLayoutManager(
         LEFT, UP, RIGHT, DOWN
     }
 
+    enum class DragAxis {
+        NONE, HORIZONTAL, VERTICAL
+    }
+
     init {
         if (visibleSpans < 1) {
             throw InvalidMaxSpansException(visibleSpans)
@@ -55,6 +59,7 @@ open class TwoWaySpannedGridLayoutManager(
     private var pendingScrollToPosition: Int? = null
     private var pendingAppendDirection = InsertDirection.DOWN
     private var pendingPrependDirection = InsertDirection.UP
+    private var dragAxis = DragAxis.NONE
 
     var itemOrderIsStable = false
 
@@ -132,6 +137,14 @@ open class TwoWaySpannedGridLayoutManager(
         pendingPrependDirection = direction
     }
 
+    fun setDragAxis(axis: DragAxis) {
+        dragAxis = axis
+    }
+
+    fun clearDragAxis() {
+        dragAxis = DragAxis.NONE
+    }
+
     fun isNearLeftEdge(thresholdSpans: Int = LOAD_MORE_THRESHOLD_SPANS): Boolean {
         return itemSize > 0 && scrollX - minScrollX() <= thresholdSpans * itemSize
     }
@@ -187,25 +200,13 @@ open class TwoWaySpannedGridLayoutManager(
     }
 
     override fun onItemsAdded(recyclerView: RecyclerView, positionStart: Int, itemCount: Int) {
-        if (itemCount <= 0 || spanFrames.isEmpty()) return
+        if (itemCount <= 0) return
 
-        when {
-            positionStart == 0 -> {
-                shiftFramesForPrepend(itemCount)
-                placeRange(0, itemCount, pendingPrependDirection)
-                knownItemCount += itemCount
-            }
-
-            positionStart >= knownItemCount -> {
-                placeRange(positionStart, itemCount, pendingAppendDirection)
-                knownItemCount += itemCount
-            }
-
-            else -> {
-                clearLayoutState(resetScroll = true)
-            }
-        }
-
+        val direction = if (positionStart == 0) pendingPrependDirection else pendingAppendDirection
+        val anchor = captureAnchor(if (positionStart == 0) itemCount else 0)
+        growContentBounds(direction, itemCount, positionStart == 0)
+        rebuildFrames(knownItemCount + itemCount)
+        restoreAnchor(anchor)
         requestLayout()
     }
 
@@ -220,84 +221,44 @@ open class TwoWaySpannedGridLayoutManager(
     private fun ensureFramesForItemCount(itemCount: Int) {
         if (spanFrames.isEmpty() || knownItemCount > itemCount) {
             clearLayoutState(resetScroll = true)
-            placeRange(0, itemCount, InsertDirection.DOWN)
-            knownItemCount = itemCount
+            ensureInitialContentBounds()
+            rebuildFrames(itemCount)
             return
         }
 
         if (spanFrames.size < itemCount) {
-            placeRange(spanFrames.size, itemCount - spanFrames.size, InsertDirection.DOWN)
-            knownItemCount = itemCount
+            growContentBounds(InsertDirection.DOWN, itemCount - spanFrames.size, false)
+            rebuildFrames(itemCount)
         }
     }
 
-    private fun placeRange(positionStart: Int, itemCount: Int, direction: InsertDirection) {
-        if (itemCount <= 0) return
+    private fun rebuildFrames(itemCount: Int) {
+        ensureInitialContentBounds()
 
-        val positions = positionStart until positionStart + itemCount
-        val placedFrames = when (direction) {
-            InsertDirection.LEFT -> placeLeft(positions)
-            InsertDirection.UP -> placeUp(positions)
-            InsertDirection.RIGHT -> placeRight(positions)
-            InsertDirection.DOWN -> placeDown(positions)
-        }
+        val layoutArea = Rect(contentBounds.left, contentBounds.top, contentBounds.right, Int.MAX_VALUE)
+        val rectsHelper = TwoWayRectsHelper(layoutArea)
+        var bottom = contentBounds.top
 
-        for ((position, frame) in placedFrames) {
-            spanFrames[position] = frame
-        }
-        recalculateContentBounds()
-    }
-
-    private fun placeDown(positions: IntRange): Map<Int, Rect> {
-        val left = if (spanFrames.isEmpty()) 0 else contentBounds.left
-        val right = if (spanFrames.isEmpty()) contentSpans else contentBounds.right
-        val top = if (spanFrames.isEmpty()) 0 else contentBounds.bottom
-        return placeInArea(positions, Rect(left, top, right, Int.MAX_VALUE))
-    }
-
-    private fun placeRight(positions: IntRange): Map<Int, Rect> {
-        val left = contentBounds.right
-        return placeInArea(
-            positions,
-            Rect(left, contentBounds.top, left + pageSpans, Int.MAX_VALUE)
-        )
-    }
-
-    private fun placeLeft(positions: IntRange): Map<Int, Rect> {
-        val right = contentBounds.left
-        return placeInArea(
-            positions,
-            Rect(right - pageSpans, contentBounds.top, right, Int.MAX_VALUE)
-        )
-    }
-
-    private fun placeUp(positions: IntRange): Map<Int, Rect> {
-        val frames = placeInArea(
-            positions,
-            Rect(contentBounds.left, 0, contentBounds.right, Int.MAX_VALUE)
-        )
-        val maxBottom = frames.values.maxOfOrNull { it.bottom } ?: 0
-        val offsetY = contentBounds.top - maxBottom
-
-        return frames.mapValues { (_, frame) ->
-            Rect(frame.left, frame.top + offsetY, frame.right, frame.bottom + offsetY)
-        }
-    }
-
-    private fun placeInArea(positions: IntRange, area: Rect): Map<Int, Rect> {
-        val rectsHelper = TwoWayRectsHelper(area)
-        val frames = linkedMapOf<Int, Rect>()
-
-        for (position in positions) {
+        spanFrames.clear()
+        for (position in 0 until itemCount) {
             val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
-            validateSpanSize(spanSize, area.width())
+            validateSpanSize(spanSize, layoutArea.width())
 
             val spanRect = rectsHelper.findRect(spanSize)
             rectsHelper.pushRect(spanRect)
-            frames[position] = spanRect
+            spanFrames[position] = spanRect
+            bottom = max(bottom, spanRect.bottom)
         }
 
-        return frames
+        contentBounds.bottom = bottom
+        knownItemCount = itemCount
+    }
+
+    private fun ensureInitialContentBounds() {
+        if (contentBounds.width() <= 0) {
+            contentBounds.left = 0
+            contentBounds.right = contentSpans
+        }
     }
 
     private fun validateSpanSize(spanSize: SpanSize, maxWidthSpans: Int) {
@@ -309,36 +270,46 @@ open class TwoWaySpannedGridLayoutManager(
         }
     }
 
-    private fun shiftFramesForPrepend(itemCount: Int) {
-        if (spanFrames.isEmpty()) return
+    private fun growContentBounds(direction: InsertDirection, itemCount: Int, isPrepend: Boolean) {
+        ensureInitialContentBounds()
 
-        val shiftedFrames = spanFrames.entries
-            .sortedByDescending { it.key }
-            .associate { (position, frame) -> position + itemCount to Rect(frame) }
-
-        spanFrames.clear()
-        spanFrames.putAll(shiftedFrames)
+        when (direction) {
+            InsertDirection.LEFT -> contentBounds.left -= pageSpans
+            InsertDirection.RIGHT -> contentBounds.right += pageSpans
+            InsertDirection.UP -> contentBounds.top -= estimateRowsForItems(itemCount)
+            InsertDirection.DOWN -> {
+                if (isPrepend) {
+                    contentBounds.top -= estimateRowsForItems(itemCount)
+                }
+            }
+        }
     }
 
-    private fun recalculateContentBounds() {
-        if (spanFrames.isEmpty()) {
-            contentBounds.set(0, 0, 0, 0)
-            return
+    private fun estimateRowsForItems(itemCount: Int): Int {
+        val widthSpans = max(1, contentBounds.width())
+        var totalArea = 0
+        for (position in 0 until itemCount) {
+            val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
+            totalArea += spanSize.width * spanSize.height
         }
+        return max(1, (totalArea + widthSpans - 1) / widthSpans)
+    }
 
-        var left = Int.MAX_VALUE
-        var top = Int.MAX_VALUE
-        var right = Int.MIN_VALUE
-        var bottom = Int.MIN_VALUE
+    private fun captureAnchor(positionOffset: Int): Anchor? {
+        if (childCount == 0 || itemSize <= 0) return null
 
-        for (frame in spanFrames.values) {
-            left = min(left, frame.left)
-            top = min(top, frame.top)
-            right = max(right, frame.right)
-            bottom = max(bottom, frame.bottom)
-        }
+        val position = firstVisiblePosition
+        val frame = spanFrames[position] ?: return null
+        return Anchor(position + positionOffset, frame.left * itemSize, frame.top * itemSize)
+    }
 
-        contentBounds.set(left, top, right, bottom)
+    private fun restoreAnchor(anchor: Anchor?) {
+        anchor ?: return
+
+        val frame = spanFrames[anchor.position] ?: return
+        scrollX += frame.left * itemSize - anchor.left
+        scrollY += frame.top * itemSize - anchor.top
+        clampScrollOffsets()
     }
 
     private fun clearLayoutState(resetScroll: Boolean) {
@@ -439,6 +410,7 @@ open class TwoWaySpannedGridLayoutManager(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State
     ): Int {
+        if (dragAxis == DragAxis.VERTICAL) return 0
         if (dx == 0 || state.itemCount == 0) return 0
 
         val travelled = scrollBy(dx, Axis.HORIZONTAL)
@@ -454,6 +426,7 @@ open class TwoWaySpannedGridLayoutManager(
         recycler: RecyclerView.Recycler,
         state: RecyclerView.State
     ): Int {
+        if (dragAxis == DragAxis.HORIZONTAL) return 0
         if (dy == 0 || state.itemCount == 0) return 0
 
         val travelled = scrollBy(dy, Axis.VERTICAL)
@@ -588,6 +561,12 @@ open class TwoWaySpannedGridLayoutManager(
     private enum class Axis {
         HORIZONTAL, VERTICAL
     }
+
+    private data class Anchor(
+        val position: Int,
+        val left: Int,
+        val top: Int
+    )
 
     class SavedState(val scrollX: Int, val scrollY: Int) : Parcelable {
         companion object {

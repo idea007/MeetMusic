@@ -1,7 +1,10 @@
 package com.dafay.demo.exoplayer.page.main.feeds
 
+import android.annotation.SuppressLint
 import android.content.ComponentName
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnNextLayout
 import androidx.media3.common.C
@@ -19,6 +22,7 @@ import com.dafay.demo.lib.base.utils.debug
 import com.dafay.demo.lib.base.utils.dp2px
 import com.example.demo.biz.base.widgets.GridMarginDecoration
 import com.google.common.util.concurrent.ListenableFuture
+import kotlin.math.abs
 
 class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::inflate) {
 
@@ -31,6 +35,9 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     private lateinit var spannedGridLayoutManager: TwoWaySpannedGridLayoutManager
     private var observerInitialized = false
     private var initialRefreshRequested = false
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var dragAxisLocked = false
 
     override fun onStart() {
         super.onStart()
@@ -91,9 +98,11 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
                     spannedGridLayoutManager.snapToNearestSpan(recyclerView)
+                    spannedGridLayoutManager.clearDragAxis()
                 }
             }
         })
+        bindDragAxisLock()
 
         feedAdapter.onItemClickListener = object : FeedAdapter.AlbumViewHolder.OnItemClickListener {
             override fun onClickItem(view: View, position: Int, mediaItem: MediaItem) {
@@ -115,6 +124,48 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
 
                 }
             }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindDragAxisLock() {
+        val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
+
+        binding.rvRecyclerview.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchDownX = event.x
+                    touchDownY = event.y
+                    dragAxisLocked = false
+                    spannedGridLayoutManager.clearDragAxis()
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    if (!dragAxisLocked) {
+                        val dx = event.x - touchDownX
+                        val dy = event.y - touchDownY
+                        val absDx = abs(dx)
+                        val absDy = abs(dy)
+
+                        if (absDx > touchSlop || absDy > touchSlop) {
+                            val axis = if (absDx >= absDy) {
+                                TwoWaySpannedGridLayoutManager.DragAxis.HORIZONTAL
+                            } else {
+                                TwoWaySpannedGridLayoutManager.DragAxis.VERTICAL
+                            }
+                            spannedGridLayoutManager.setDragAxis(axis)
+                            dragAxisLocked = true
+                        }
+                    }
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    dragAxisLocked = false
+                }
+            }
+
+            false
         }
     }
 
