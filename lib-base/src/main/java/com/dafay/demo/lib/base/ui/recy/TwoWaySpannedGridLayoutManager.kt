@@ -12,7 +12,6 @@ import android.util.SparseArray
 import android.view.View
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -62,6 +61,7 @@ open class TwoWaySpannedGridLayoutManager(
     private var pendingScrollToPosition: Int? = null
     private var pendingAppendDirection = InsertDirection.DOWN
     private var pendingPrependDirection = InsertDirection.UP
+    private val pendingBlankFillAreas = mutableListOf<Rect>()
     private var dragAxis = DragAxis.NONE
 
     var itemOrderIsStable = false
@@ -135,10 +135,12 @@ open class TwoWaySpannedGridLayoutManager(
 
     fun prepareForAppend(direction: InsertDirection) {
         pendingAppendDirection = direction
+        prepareVisibleBlankFillAreas()
     }
 
     fun prepareForPrepend(direction: InsertDirection) {
         pendingPrependDirection = direction
+        prepareVisibleBlankFillAreas()
     }
 
     fun setDragAxis(axis: DragAxis) {
@@ -165,13 +167,39 @@ open class TwoWaySpannedGridLayoutManager(
         return itemSize > 0 && maxScrollY() - scrollY <= thresholdSpans * itemSize
     }
 
+    fun findVisibleBlankDirections(minBlankSizePx: Int = max(1, itemSize / 2)): List<InsertDirection> {
+        if (itemSize <= 0 || horizontalSpace <= 0 || verticalSpace <= 0) {
+            return emptyList()
+        }
+
+        val viewport = visibleSpanRect() ?: return emptyList()
+        val minBlankSpans = max(1, ceilDiv(max(1, minBlankSizePx), itemSize))
+        for (blankArea in findVisibleBlankSpanAreas(viewport)) {
+            if (blankArea.width() >= minBlankSpans || blankArea.height() >= minBlankSpans) {
+                return listOf(InsertDirection.DOWN)
+            }
+        }
+
+        return emptyList()
+    }
+
     fun snapToNearestSpan(recyclerView: RecyclerView) {
         if (itemSize <= 0) return
 
         val targetX = (scrollX.toFloat() / itemSize).roundToInt() * itemSize
         val targetY = (scrollY.toFloat() / itemSize).roundToInt() * itemSize
-        val correctedX = targetX.coerceIn(minScrollX(), maxScrollX())
-        val correctedY = targetY.coerceIn(minScrollY(), maxScrollY())
+        val horizontalBounds = visibleSliceScrollBounds(Axis.HORIZONTAL)
+        val verticalBounds = visibleSliceScrollBounds(Axis.VERTICAL)
+        val correctedX = if (horizontalBounds != null) {
+            targetX.coerceIn(horizontalBounds.min, horizontalBounds.max)
+        } else {
+            targetX.coerceIn(minScrollX(), maxScrollX())
+        }
+        val correctedY = if (verticalBounds != null) {
+            targetY.coerceIn(verticalBounds.min, verticalBounds.max)
+        } else {
+            targetY.coerceIn(minScrollY(), maxScrollY())
+        }
         val dx = correctedX - scrollX
         val dy = correctedY - scrollY
 
@@ -285,13 +313,16 @@ open class TwoWaySpannedGridLayoutManager(
 
     private fun layoutPrependedFrames(direction: InsertDirection, itemCount: Int) {
         ensureInitialContentBounds()
+        var positions = (0 until itemCount).toMutableList()
+        positions = layoutPendingBlankFillFrames(positions)
+        if (positions.isEmpty()) return
 
         when (direction) {
             InsertDirection.LEFT -> {
                 val oldLeft = contentBounds.left
                 val newLeft = oldLeft - pageSpans
                 val layoutArea = Rect(newLeft, contentBounds.top, oldLeft, Int.MAX_VALUE)
-                val bottom = layoutFramesInArea(0, itemCount, layoutArea)
+                val bottom = layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.left = newLeft
                 contentBounds.bottom = max(contentBounds.bottom, bottom)
@@ -299,29 +330,36 @@ open class TwoWaySpannedGridLayoutManager(
 
             InsertDirection.UP,
             InsertDirection.DOWN -> {
-                val height = measureRowsForItems(0, itemCount, contentBounds.width())
+                val height = measureRowsForPositions(positions, contentBounds.width())
                 val oldTop = contentBounds.top
                 val layoutArea = Rect(contentBounds.left, oldTop - height, contentBounds.right, Int.MAX_VALUE)
-                layoutFramesInArea(0, itemCount, layoutArea)
+                layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.top = oldTop - height
             }
 
             InsertDirection.RIGHT -> {
-                layoutAppendedFrames(InsertDirection.RIGHT, 0, itemCount)
+                layoutAppendedPositions(InsertDirection.RIGHT, positions)
             }
         }
     }
 
     private fun layoutAppendedFrames(direction: InsertDirection, positionStart: Int, itemCount: Int) {
         ensureInitialContentBounds()
+        var positions = (positionStart until positionStart + itemCount).toMutableList()
+        positions = layoutPendingBlankFillFrames(positions)
+        if (positions.isEmpty()) return
 
+        layoutAppendedPositions(direction, positions)
+    }
+
+    private fun layoutAppendedPositions(direction: InsertDirection, positions: List<Int>) {
         when (direction) {
             InsertDirection.RIGHT -> {
                 val oldRight = contentBounds.right
                 val newRight = oldRight + pageSpans
                 val layoutArea = Rect(oldRight, contentBounds.top, newRight, Int.MAX_VALUE)
-                val bottom = layoutFramesInArea(positionStart, itemCount, layoutArea)
+                val bottom = layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.right = newRight
                 contentBounds.bottom = max(contentBounds.bottom, bottom)
@@ -331,33 +369,64 @@ open class TwoWaySpannedGridLayoutManager(
                 val oldLeft = contentBounds.left
                 val newLeft = oldLeft - pageSpans
                 val layoutArea = Rect(newLeft, contentBounds.top, oldLeft, Int.MAX_VALUE)
-                val bottom = layoutFramesInArea(positionStart, itemCount, layoutArea)
+                val bottom = layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.left = newLeft
                 contentBounds.bottom = max(contentBounds.bottom, bottom)
             }
 
             InsertDirection.UP -> {
-                val height = measureRowsForItems(positionStart, itemCount, contentBounds.width())
+                val height = measureRowsForPositions(positions, contentBounds.width())
                 val oldTop = contentBounds.top
                 val layoutArea = Rect(contentBounds.left, oldTop - height, contentBounds.right, Int.MAX_VALUE)
-                layoutFramesInArea(positionStart, itemCount, layoutArea)
+                layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.top = oldTop - height
             }
 
             InsertDirection.DOWN -> {
                 val layoutArea = Rect(contentBounds.left, contentBounds.bottom, contentBounds.right, Int.MAX_VALUE)
-                contentBounds.bottom = layoutFramesInArea(positionStart, itemCount, layoutArea)
+                contentBounds.bottom = layoutPositionsInArea(positions, layoutArea)
             }
         }
     }
 
+    private fun layoutPendingBlankFillFrames(positions: MutableList<Int>): MutableList<Int> {
+        if (positions.isEmpty() || pendingBlankFillAreas.isEmpty()) {
+            return positions
+        }
+
+        val blankAreas = pendingBlankFillAreas.toList()
+        pendingBlankFillAreas.clear()
+        var remainingPositions = positions
+
+        for (blankArea in blankAreas) {
+            if (remainingPositions.isEmpty()) {
+                break
+            }
+            if (blankArea.width() <= 0 || blankArea.height() <= 0 || hasFrameIntersectingSpanRect(blankArea)) {
+                continue
+            }
+
+            val beforeCount = remainingPositions.size
+            remainingPositions = layoutPositionsInAreaUntilFull(remainingPositions, blankArea)
+            if (remainingPositions.size < beforeCount) {
+                contentBounds.union(blankArea)
+                markOccupiedBoundsDirty()
+            }
+        }
+        return remainingPositions
+    }
+
     private fun layoutFramesInArea(positionStart: Int, itemCount: Int, layoutArea: Rect): Int {
+        return layoutPositionsInArea((positionStart until positionStart + itemCount).toList(), layoutArea)
+    }
+
+    private fun layoutPositionsInArea(positions: List<Int>, layoutArea: Rect): Int {
         val rectsHelper = TwoWayRectsHelper(layoutArea)
         var bottom = layoutArea.top
 
-        for (position in positionStart until positionStart + itemCount) {
+        for (position in positions) {
             val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
             validateSpanSize(spanSize, layoutArea.width())
 
@@ -371,12 +440,40 @@ open class TwoWaySpannedGridLayoutManager(
         return bottom
     }
 
+    private fun layoutPositionsInAreaUntilFull(positions: List<Int>, layoutArea: Rect): MutableList<Int> {
+        val rectsHelper = TwoWayRectsHelper(layoutArea)
+        val remainingPositions = mutableListOf<Int>()
+
+        for (position in positions) {
+            val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
+            if (spanSize.width < 1 || spanSize.width > layoutArea.width() || spanSize.height > layoutArea.height()) {
+                remainingPositions.add(position)
+                continue
+            }
+
+            val spanRect = rectsHelper.findRectOrNull(spanSize)
+            if (spanRect == null) {
+                remainingPositions.add(position)
+            } else {
+                rectsHelper.pushRect(spanRect)
+                spanFrames[position] = spanRect
+            }
+        }
+
+        markOccupiedBoundsDirty()
+        return remainingPositions
+    }
+
     private fun measureRowsForItems(positionStart: Int, itemCount: Int, widthSpans: Int): Int {
+        return measureRowsForPositions((positionStart until positionStart + itemCount).toList(), widthSpans)
+    }
+
+    private fun measureRowsForPositions(positions: List<Int>, widthSpans: Int): Int {
         val layoutArea = Rect(0, 0, max(1, widthSpans), Int.MAX_VALUE)
         val rectsHelper = TwoWayRectsHelper(layoutArea)
         var bottom = layoutArea.top
 
-        for (position in positionStart until positionStart + itemCount) {
+        for (position in positions) {
             val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
             validateSpanSize(spanSize, layoutArea.width())
 
@@ -455,6 +552,7 @@ open class TwoWaySpannedGridLayoutManager(
         pendingScrollToPosition = null
         pendingAppendDirection = InsertDirection.DOWN
         pendingPrependDirection = InsertDirection.UP
+        pendingBlankFillAreas.clear()
 
         if (resetScroll) {
             scrollX = 0
@@ -614,50 +712,42 @@ open class TwoWaySpannedGridLayoutManager(
     private fun findAllowedTravel(delta: Int, axis: Axis): Int {
         if (delta == 0) return 0
 
-        val currentOffset = if (axis == Axis.HORIZONTAL) scrollX else scrollY
-        val targetOffset = if (axis == Axis.HORIZONTAL) {
-            (scrollX + delta).coerceIn(minScrollX(), maxScrollX())
-        } else {
-            (scrollY + delta).coerceIn(minScrollY(), maxScrollY())
+        val sliceBounds = visibleSliceScrollBounds(axis)
+        if (sliceBounds == null) {
+            notifyScrollBlocked(axis, delta)
+            return 0
         }
-        val requestedTravel = targetOffset - currentOffset
+
+        val currentOffset = if (axis == Axis.HORIZONTAL) scrollX else scrollY
+        val requestedTravel = travelWithinBounds(currentOffset, delta, sliceBounds)
         if (requestedTravel == 0) {
             notifyScrollBlocked(axis, delta)
             return 0
         }
 
-        val targetX = if (axis == Axis.HORIZONTAL) targetOffset else scrollX
-        val targetY = if (axis == Axis.VERTICAL) targetOffset else scrollY
-        if (hasVisibleFrameAt(targetX, targetY)) {
-            if (requestedTravel != delta) {
-                notifyScrollBlocked(axis, delta)
-            }
-            return requestedTravel
-        }
-
-        val direction = requestedTravel.compareTo(0)
-        var low = 0
-        var high = abs(requestedTravel)
-        var bestTravel = 0
-
-        while (low <= high) {
-            val middle = (low + high) / 2
-            val candidateTravel = direction * middle
-            val candidateX = if (axis == Axis.HORIZONTAL) scrollX + candidateTravel else scrollX
-            val candidateY = if (axis == Axis.VERTICAL) scrollY + candidateTravel else scrollY
-
-            if (middle == 0 || hasVisibleFrameAt(candidateX, candidateY)) {
-                bestTravel = candidateTravel
-                low = middle + 1
-            } else {
-                high = middle - 1
-            }
-        }
-
-        if (bestTravel != requestedTravel) {
+        val targetX = if (axis == Axis.HORIZONTAL) scrollX + requestedTravel else scrollX
+        val targetY = if (axis == Axis.VERTICAL) scrollY + requestedTravel else scrollY
+        val targetHasContent = hasVisibleFrameAt(targetX, targetY)
+        if (!targetHasContent || requestedTravel != delta) {
             notifyScrollBlocked(axis, delta)
         }
-        return bestTravel
+        return if (targetHasContent) requestedTravel else 0
+    }
+
+    private fun travelWithinBounds(currentOffset: Int, delta: Int, bounds: ScrollBounds): Int {
+        val targetOffset = currentOffset + delta
+
+        return when {
+            currentOffset < bounds.min -> {
+                if (delta <= 0) 0 else min(targetOffset, bounds.max) - currentOffset
+            }
+
+            currentOffset > bounds.max -> {
+                if (delta >= 0) 0 else max(targetOffset, bounds.min) - currentOffset
+            }
+
+            else -> targetOffset.coerceIn(bounds.min, bounds.max) - currentOffset
+        }
     }
 
     private fun notifyScrollBlocked(axis: Axis, delta: Int) {
@@ -684,6 +774,24 @@ open class TwoWaySpannedGridLayoutManager(
             }
         }
 
+        return false
+    }
+
+    private fun hasFrameIntersectingPixelRect(rect: Rect): Boolean {
+        for (frame in spanFrames.values) {
+            if (rect.intersects(frame.toPixelRect())) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun hasFrameIntersectingSpanRect(rect: Rect): Boolean {
+        for (frame in spanFrames.values) {
+            if (rect.intersects(frame)) {
+                return true
+            }
+        }
         return false
     }
 
@@ -722,6 +830,188 @@ open class TwoWaySpannedGridLayoutManager(
         }
 
         return nearestOffset
+    }
+
+    private fun visibleSliceScrollBounds(axis: Axis): ScrollBounds? {
+        val edges = visibleSliceContentEdges(axis) ?: return null
+        val maxOffset = if (axis == Axis.HORIZONTAL) {
+            edges.max - horizontalSpace
+        } else {
+            edges.max - verticalSpace
+        }
+        val normalizedMax = max(edges.min, maxOffset)
+        return ScrollBounds(edges.min, normalizedMax)
+    }
+
+    private fun visibleSliceContentEdges(axis: Axis): ContentEdges? {
+        if (horizontalSpace <= 0 || verticalSpace <= 0 || spanFrames.isEmpty()) return null
+        val orthogonalStart = if (axis == Axis.HORIZONTAL) scrollY else scrollX
+        val orthogonalEnd = if (axis == Axis.HORIZONTAL) scrollY + verticalSpace else scrollX + horizontalSpace
+        var minEdge = Int.MAX_VALUE
+        var maxEdge = Int.MIN_VALUE
+
+        for (frame in spanFrames.values) {
+            val pixelFrame = frame.toPixelRect()
+            val intersectsSlice = if (axis == Axis.HORIZONTAL) {
+                pixelFrame.bottom > orthogonalStart && pixelFrame.top < orthogonalEnd
+            } else {
+                pixelFrame.right > orthogonalStart && pixelFrame.left < orthogonalEnd
+            }
+            if (!intersectsSlice) continue
+
+            if (axis == Axis.HORIZONTAL) {
+                minEdge = min(minEdge, pixelFrame.left)
+                maxEdge = max(maxEdge, pixelFrame.right)
+            } else {
+                minEdge = min(minEdge, pixelFrame.top)
+                maxEdge = max(maxEdge, pixelFrame.bottom)
+            }
+        }
+
+        if (minEdge == Int.MAX_VALUE) return null
+        return ContentEdges(minEdge, maxEdge)
+    }
+
+    private fun prepareVisibleBlankFillAreas() {
+        pendingBlankFillAreas.clear()
+        val viewport = visibleSpanRect() ?: return
+        pendingBlankFillAreas.addAll(findVisibleBlankSpanAreas(viewport))
+    }
+
+    private fun findVisibleBlankSpanAreas(viewport: Rect): List<Rect> {
+        val blankAreas = mutableListOf<Rect>()
+
+        for (row in viewport.top until viewport.bottom) {
+            var runStart: Int? = null
+
+            for (column in viewport.left until viewport.right) {
+                val cell = Rect(column, row, column + 1, row + 1)
+                val isBlank = !hasFrameIntersectingSpanRect(cell)
+                if (isBlank) {
+                    if (runStart == null) {
+                        runStart = column
+                    }
+                } else {
+                    appendBlankRun(blankAreas, runStart, column, row)
+                    runStart = null
+                }
+            }
+
+            appendBlankRun(blankAreas, runStart, viewport.right, row)
+        }
+
+        return blankAreas.sortedWith(
+            compareBy<Rect> { it.top }
+                .thenBy { it.left }
+                .thenByDescending { it.width() * it.height() }
+        )
+    }
+
+    private fun appendBlankRun(blankAreas: MutableList<Rect>, runStart: Int?, runEnd: Int, row: Int) {
+        val start = runStart ?: return
+        if (runEnd <= start) return
+
+        val existing = blankAreas.asReversed().firstOrNull {
+            it.left == start && it.right == runEnd && it.bottom == row
+        }
+        if (existing != null) {
+            existing.bottom = row + 1
+        } else {
+            blankAreas.add(Rect(start, row, runEnd, row + 1))
+        }
+    }
+
+    private fun visibleSpanRect(): Rect? {
+        if (itemSize <= 0 || horizontalSpace <= 0 || verticalSpace <= 0) return null
+
+        return Rect(
+            floorSpan(scrollX),
+            floorSpan(scrollY),
+            ceilSpan(scrollX + horizontalSpace),
+            ceilSpan(scrollY + verticalSpace)
+        )
+    }
+
+    private fun findLargestBlankRowArea(viewport: Rect): Rect? {
+        var currentStart: Int? = null
+        var bestStart = 0
+        var bestEnd = 0
+
+        for (row in viewport.top until viewport.bottom) {
+            val rowRect = Rect(viewport.left, row, viewport.right, row + 1)
+            val isBlank = !hasFrameIntersectingSpanRect(rowRect)
+            if (isBlank) {
+                if (currentStart == null) {
+                    currentStart = row
+                }
+            } else {
+                val start = currentStart
+                if (start != null && row - start > bestEnd - bestStart) {
+                    bestStart = start
+                    bestEnd = row
+                }
+                currentStart = null
+            }
+        }
+
+        val start = currentStart
+        if (start != null && viewport.bottom - start > bestEnd - bestStart) {
+            bestStart = start
+            bestEnd = viewport.bottom
+        }
+
+        return if (bestEnd > bestStart) {
+            Rect(viewport.left, bestStart, viewport.right, bestEnd)
+        } else {
+            null
+        }
+    }
+
+    private fun findLargestBlankColumnArea(viewport: Rect): Rect? {
+        var currentStart: Int? = null
+        var bestStart = 0
+        var bestEnd = 0
+
+        for (column in viewport.left until viewport.right) {
+            val columnRect = Rect(column, viewport.top, column + 1, viewport.bottom)
+            val isBlank = !hasFrameIntersectingSpanRect(columnRect)
+            if (isBlank) {
+                if (currentStart == null) {
+                    currentStart = column
+                }
+            } else {
+                val start = currentStart
+                if (start != null && column - start > bestEnd - bestStart) {
+                    bestStart = start
+                    bestEnd = column
+                }
+                currentStart = null
+            }
+        }
+
+        val start = currentStart
+        if (start != null && viewport.right - start > bestEnd - bestStart) {
+            bestStart = start
+            bestEnd = viewport.right
+        }
+
+        return if (bestEnd > bestStart) {
+            Rect(bestStart, viewport.top, bestEnd, viewport.bottom)
+        } else {
+            null
+        }
+    }
+
+    private fun floorSpan(pixel: Int): Int {
+        return Math.floorDiv(pixel, itemSize)
+    }
+
+    private fun ceilSpan(pixel: Int): Int {
+        return -Math.floorDiv(-pixel, itemSize)
+    }
+
+    private fun ceilDiv(value: Int, divisor: Int): Int {
+        return (value + divisor - 1) / divisor
     }
 
     private fun nearestViewportOffsetForFrame(
@@ -895,6 +1185,16 @@ open class TwoWaySpannedGridLayoutManager(
         val y: Int
     )
 
+    private data class ScrollBounds(
+        val min: Int,
+        val max: Int
+    )
+
+    private data class ContentEdges(
+        val min: Int,
+        val max: Int
+    )
+
     class SavedState(val scrollX: Int, val scrollY: Int) : Parcelable {
         companion object {
             @JvmField
@@ -941,7 +1241,12 @@ private class TwoWayRectsHelper(private val area: Rect) {
     }
 
     fun findRect(spanSize: SpanSize): Rect {
-        val lane = freeRects.first {
+        return findRectOrNull(spanSize)
+            ?: throw NoSuchElementException("No free rect can contain span size ${spanSize.width}x${spanSize.height}")
+    }
+
+    fun findRectOrNull(spanSize: SpanSize): Rect? {
+        val lane = freeRects.firstOrNull {
             val itemRect = Rect(
                 it.left,
                 it.top,
@@ -949,7 +1254,7 @@ private class TwoWayRectsHelper(private val area: Rect) {
                 it.top + spanSize.height
             )
             it.contains(itemRect)
-        }
+        } ?: return null
 
         return Rect(
             lane.left,

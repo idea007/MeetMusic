@@ -11,6 +11,7 @@ import androidx.media3.session.MediaBrowser
 import androidx.media3.session.MediaLibraryService
 import com.dafay.demo.data.source.data.Result
 import com.example.demo.meetsplash.data.model.PAGE
+import java.util.ArrayDeque
 import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.random.Random
@@ -27,91 +28,90 @@ data class FeedPageEvent(
 class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val queryExecutor = Executors.newSingleThreadExecutor()
-    private val activeDirections = mutableSetOf<FeedLoadDirection>()
-    private val queuedLoads = mutableMapOf<FeedLoadDirection, Int>()
-    private var nextForwardPage = 0
-    private var nextBackwardPage = 0
+    private val cachedPages = ArrayDeque<List<MediaItem>>()
+    private val pendingDirections = ArrayDeque<FeedLoadDirection>()
+    private val lockedDirections = mutableSetOf<FeedLoadDirection>()
+    private var activeCacheRequests = 0
+    private var initialLoading = false
+    private var nextCachePage = 0
+    private var queryGeneration = 0
 
     val feedPageLiveData = MutableLiveData<FeedPageEvent>()
 
     fun refresh() {
-        if (!activeDirections.add(FeedLoadDirection.INITIAL)) {
+        if (initialLoading) {
             return
         }
 
-        queuedLoads.clear()
+        initialLoading = true
+        queryGeneration++
+        cachedPages.clear()
+        pendingDirections.clear()
+        lockedDirections.clear()
+        activeCacheRequests = 0
         val startPage = Random.nextInt(0, 100) * 100
-        nextForwardPage = startPage + 1
-        nextBackwardPage = max(0, startPage - 1)
-        query(startPage, FeedLoadDirection.INITIAL)
+        nextCachePage = startPage + 1
+        query(startPage, QueryTarget.INITIAL, queryGeneration)
     }
 
     fun loadMore(direction: FeedLoadDirection) {
-        ensureLoadDepth(direction, 1)
+        if (direction == FeedLoadDirection.INITIAL || initialLoading) {
+            return
+        }
+        if (!lockedDirections.add(direction)) {
+            return
+        }
+
+        val cachedPage = cachedPages.pollFirst()
+        if (cachedPage != null) {
+            replaceConsumedCachePage()
+            feedPageLiveData.value = FeedPageEvent(direction, Result.Success(cachedPage))
+            return
+        }
+
+        pendingDirections.add(direction)
+        ensureCacheFilled(DEFAULT_PREFETCH_PAGE_COUNT)
     }
 
     fun prefetchAround(pageCount: Int = DEFAULT_PREFETCH_PAGE_COUNT) {
-        PREFETCH_DIRECTIONS.forEach { direction ->
-            ensureLoadDepth(direction, pageCount)
+        ensureCacheFilled(pageCount)
+    }
+
+    fun onPageApplied(direction: FeedLoadDirection) {
+        if (direction != FeedLoadDirection.INITIAL) {
+            lockedDirections.remove(direction)
         }
     }
 
-    private fun ensureLoadDepth(direction: FeedLoadDirection, targetCount: Int) {
-        if (direction == FeedLoadDirection.INITIAL || targetCount <= 0) {
+    private fun ensureCacheFilled(targetCount: Int) {
+        if (initialLoading || targetCount <= 0) {
             return
         }
 
-        val activeCount = if (activeDirections.contains(direction)) 1 else 0
-        val queuedCount = queuedLoads[direction] ?: 0
-        val missingCount = targetCount - activeCount - queuedCount
-        if (missingCount <= 0) {
-            return
+        val missingCount = targetCount - cachedPages.size - activeCacheRequests
+        repeat(max(0, missingCount)) {
+            requestCachePage()
         }
-
-        queuedLoads[direction] = queuedCount + missingCount
-        drainQueuedLoad(direction)
     }
 
-    private fun drainQueuedLoad(direction: FeedLoadDirection) {
-        if (activeDirections.contains(direction)) {
+    private fun replaceConsumedCachePage() {
+        if (initialLoading) {
             return
         }
 
-        val queuedCount = queuedLoads[direction] ?: 0
-        if (queuedCount <= 0) {
-            return
-        }
-
-        if (queuedCount == 1) {
-            queuedLoads.remove(direction)
-        } else {
-            queuedLoads[direction] = queuedCount - 1
-        }
-
-        activeDirections.add(direction)
-        val page = when (direction) {
-            FeedLoadDirection.LEFT,
-            FeedLoadDirection.UP -> takeBackwardPage()
-            FeedLoadDirection.RIGHT,
-            FeedLoadDirection.DOWN -> nextForwardPage++
-            FeedLoadDirection.INITIAL -> nextForwardPage++
-        }
-        query(page, direction)
+        requestCachePage()
     }
 
-    private fun takeBackwardPage(): Int {
-        val page = nextBackwardPage
-        nextBackwardPage = if (nextBackwardPage > 0) {
-            nextBackwardPage - 1
-        } else {
-            Random.nextInt(0, 100) * 100
-        }
-        return page
+    private fun requestCachePage() {
+        activeCacheRequests++
+        query(nextCachePage++, QueryTarget.CACHE, queryGeneration)
     }
 
     @SuppressLint("UnsafeOptInUsageError")
-    private fun query(page: Int, direction: FeedLoadDirection) {
-        feedPageLiveData.postValue(FeedPageEvent(direction, Result.Loading))
+    private fun query(page: Int, target: QueryTarget, generation: Int) {
+        if (target == QueryTarget.INITIAL) {
+            feedPageLiveData.postValue(FeedPageEvent(FeedLoadDirection.INITIAL, Result.Loading))
+        }
 
         val pageSize = PAGE.PAGE_SIZE_THIRTY
         val params = MediaLibraryService.LibraryParams.Builder().setExtras(Bundle().apply {
@@ -130,32 +130,58 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
 
         childrenFuture.addListener(
             {
-                var shouldDrainQueue = false
-                try {
-                    val children = childrenFuture.get().value
-                    if (children.isNullOrEmpty()) {
-                        feedPageLiveData.postValue(FeedPageEvent(direction, Result.Error(201, "无数据")))
-                    } else {
-                        shouldDrainQueue = true
-                        feedPageLiveData.postValue(FeedPageEvent(direction, Result.Success(children)))
-                    }
+                val result = try {
+                    childrenFuture.get().value
                 } catch (e: Exception) {
-                    feedPageLiveData.postValue(FeedPageEvent(direction, Result.Error(error = e.message)))
-                } finally {
-                    mainHandler.post {
-                        activeDirections.remove(direction)
-                        if (direction != FeedLoadDirection.INITIAL) {
-                            if (shouldDrainQueue) {
-                                drainQueuedLoad(direction)
-                            } else {
-                                queuedLoads.remove(direction)
-                            }
-                        }
+                    null
+                }
+
+                mainHandler.post {
+                    if (generation != queryGeneration) {
+                        return@post
                     }
+
+                    handleQueryResult(target, result)
                 }
             },
             queryExecutor
         )
+    }
+
+    private fun handleQueryResult(target: QueryTarget, children: List<MediaItem>?) {
+        when (target) {
+            QueryTarget.INITIAL -> {
+                initialLoading = false
+                if (children.isNullOrEmpty()) {
+                    feedPageLiveData.value = FeedPageEvent(FeedLoadDirection.INITIAL, Result.Error(201, "无数据"))
+                } else {
+                    feedPageLiveData.value = FeedPageEvent(FeedLoadDirection.INITIAL, Result.Success(children))
+                    ensureCacheFilled(DEFAULT_PREFETCH_PAGE_COUNT)
+                }
+            }
+
+            QueryTarget.CACHE -> {
+                activeCacheRequests = max(0, activeCacheRequests - 1)
+                if (children.isNullOrEmpty()) {
+                    val failedDirection = pendingDirections.pollFirst()
+                    if (failedDirection != null) {
+                        lockedDirections.remove(failedDirection)
+                        feedPageLiveData.value = FeedPageEvent(failedDirection, Result.Error(201, "无数据"))
+                    }
+                    return
+                }
+
+                val direction = pendingDirections.pollFirst()
+                if (direction != null) {
+                    replaceConsumedCachePage()
+                    feedPageLiveData.value = FeedPageEvent(direction, Result.Success(children))
+                } else {
+                    cachedPages.addLast(children)
+                }
+
+                ensureCacheFilled(DEFAULT_PREFETCH_PAGE_COUNT)
+            }
+        }
     }
 
     fun release() {
@@ -167,14 +193,11 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
         super.onCleared()
     }
 
-    companion object {
-        const val DEFAULT_PREFETCH_PAGE_COUNT = 3
+    private enum class QueryTarget {
+        INITIAL, CACHE
+    }
 
-        private val PREFETCH_DIRECTIONS = listOf(
-            FeedLoadDirection.UP,
-            FeedLoadDirection.DOWN,
-            FeedLoadDirection.LEFT,
-            FeedLoadDirection.RIGHT
-        )
+    companion object {
+        const val DEFAULT_PREFETCH_PAGE_COUNT = 12
     }
 }

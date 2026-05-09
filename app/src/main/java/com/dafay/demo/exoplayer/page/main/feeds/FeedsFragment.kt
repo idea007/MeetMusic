@@ -75,9 +75,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
         binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
         binding.rvRecyclerview.adapter = feedAdapter
         spannedGridLayoutManager.onScrollBlocked = { direction ->
-            if (::viewModel.isInitialized && feedAdapter.datas.isNotEmpty()) {
-                viewModel.loadMore(direction.toFeedLoadDirection())
-            }
+            requestLoadMore(direction.toFeedLoadDirection())
         }
 
         spannedGridLayoutManager.spanSizeLookup = TwoWaySpannedGridLayoutManager.SpanSizeLookup { position ->
@@ -99,15 +97,15 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
                 }
 
                 if (dx > 0 && spannedGridLayoutManager.isNearRightEdge()) {
-                    viewModel.loadMore(FeedLoadDirection.RIGHT)
+                    requestLoadMore(FeedLoadDirection.RIGHT)
                 } else if (dx < 0 && spannedGridLayoutManager.isNearLeftEdge()) {
-                    viewModel.loadMore(FeedLoadDirection.LEFT)
+                    requestLoadMore(FeedLoadDirection.LEFT)
                 }
 
                 if (dy > 0 && spannedGridLayoutManager.isNearBottomEdge()) {
-                    viewModel.loadMore(FeedLoadDirection.DOWN)
+                    requestLoadMore(FeedLoadDirection.DOWN)
                 } else if (dy < 0 && spannedGridLayoutManager.isNearTopEdge()) {
-                    viewModel.loadMore(FeedLoadDirection.UP)
+                    requestLoadMore(FeedLoadDirection.UP)
                 }
             }
 
@@ -122,7 +120,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
                         spannedGridLayoutManager.clearDragAxis()
 
                         if (wasDragging && ::viewModel.isInitialized && feedAdapter.datas.isNotEmpty()) {
-                            viewModel.prefetchAround(FeedsViewModel.DEFAULT_PREFETCH_PAGE_COUNT)
+                            scheduleBlankFillAndPrefetch()
                         }
                         wasDragging = false
                     }
@@ -217,20 +215,31 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             when (val result = it.result) {
                 is Result.Loading -> {}
                 is Result.Success -> {
-                    applyPage(it.direction, result.value)
+                    applyPageWhenSafe(it.direction, result.value)
                 }
                 else -> {}
             }
         }
     }
 
+    private fun applyPageWhenSafe(direction: FeedLoadDirection, mediaItems: List<MediaItem>) {
+        if (view == null) return
+
+        val recyclerView = binding.rvRecyclerview
+        if (recyclerView.isComputingLayout) {
+            recyclerView.post {
+                applyPageWhenSafe(direction, mediaItems)
+            }
+            return
+        }
+
+        applyPage(direction, mediaItems)
+    }
+
     private fun applyPage(direction: FeedLoadDirection, mediaItems: List<MediaItem>) {
         when (direction) {
             FeedLoadDirection.INITIAL -> {
                 feedAdapter.setDatas(mediaItems)
-                binding.rvRecyclerview.doOnNextLayout {
-                    viewModel.prefetchAround(FeedsViewModel.DEFAULT_PREFETCH_PAGE_COUNT)
-                }
             }
 
             FeedLoadDirection.LEFT,
@@ -244,6 +253,34 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
                 spannedGridLayoutManager.prepareForAppend(direction.toInsertDirection())
                 feedAdapter.addDatas(mediaItems)
             }
+        }
+
+        binding.rvRecyclerview.doOnNextLayout {
+            viewModel.onPageApplied(direction)
+            scheduleBlankFillAndPrefetch()
+        }
+    }
+
+    private fun scheduleBlankFillAndPrefetch() {
+        binding.rvRecyclerview.post {
+            if (view == null || !::viewModel.isInitialized || feedAdapter.datas.isEmpty()) {
+                return@post
+            }
+
+            spannedGridLayoutManager.findVisibleBlankDirections().forEach { direction ->
+                requestLoadMore(direction.toFeedLoadDirection())
+            }
+            viewModel.prefetchAround(FeedsViewModel.DEFAULT_PREFETCH_PAGE_COUNT)
+        }
+    }
+
+    private fun requestLoadMore(direction: FeedLoadDirection) {
+        binding.rvRecyclerview.post {
+            if (view == null || !::viewModel.isInitialized || feedAdapter.datas.isEmpty()) {
+                return@post
+            }
+
+            viewModel.loadMore(direction)
         }
     }
 
