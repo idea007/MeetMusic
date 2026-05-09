@@ -232,7 +232,10 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     }
 
     private fun applyPageWhenSafe(direction: FeedLoadDirection, mediaItems: List<MediaItem>) {
-        if (view == null) return
+        if (view == null) {
+            viewModel.onPageApplied(direction)
+            return
+        }
 
         val recyclerView = binding.rvRecyclerview
         if (recyclerView.isComputingLayout) {

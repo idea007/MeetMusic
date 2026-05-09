@@ -30,11 +30,12 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
     private val queryExecutor = Executors.newSingleThreadExecutor()
     private val cachedPages = ArrayDeque<List<MediaItem>>()
     private val pendingDirections = ArrayDeque<FeedLoadDirection>()
-    private val lockedDirections = mutableSetOf<FeedLoadDirection>()
+    private val applyingDirections = mutableSetOf<FeedLoadDirection>()
     private var activeCacheRequests = 0
     private var initialLoading = false
     private var nextCachePage = 0
     private var queryGeneration = 0
+    private val requestedInitialPages = mutableSetOf<Int>()
 
     val feedPageLiveData = MutableLiveData<FeedPageEvent>()
 
@@ -47,23 +48,23 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
         queryGeneration++
         cachedPages.clear()
         pendingDirections.clear()
-        lockedDirections.clear()
+        applyingDirections.clear()
+        requestedInitialPages.clear()
         activeCacheRequests = 0
-        val startPage = Random.nextInt(0, 100) * 100
-        nextCachePage = startPage + 1
-        query(startPage, QueryTarget.INITIAL, queryGeneration)
+        requestInitialPage(Random.nextInt(0, INITIAL_RANDOM_PAGE_BOUND))
     }
 
     fun loadMore(direction: FeedLoadDirection) {
         if (direction == FeedLoadDirection.INITIAL || initialLoading) {
             return
         }
-        if (!lockedDirections.add(direction)) {
+        if (direction in applyingDirections || direction in pendingDirections) {
             return
         }
 
         val cachedPage = cachedPages.pollFirst()
         if (cachedPage != null) {
+            applyingDirections.add(direction)
             replaceConsumedCachePage()
             feedPageLiveData.value = FeedPageEvent(direction, Result.Success(cachedPage))
             return
@@ -79,7 +80,7 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
 
     fun onPageApplied(direction: FeedLoadDirection) {
         if (direction != FeedLoadDirection.INITIAL) {
-            lockedDirections.remove(direction)
+            applyingDirections.remove(direction)
         }
     }
 
@@ -105,6 +106,12 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
     private fun requestCachePage() {
         activeCacheRequests++
         query(nextCachePage++, QueryTarget.CACHE, queryGeneration)
+    }
+
+    private fun requestInitialPage(page: Int) {
+        requestedInitialPages.add(page)
+        nextCachePage = page + 1
+        query(page, QueryTarget.INITIAL, queryGeneration)
     }
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -151,10 +158,17 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
     private fun handleQueryResult(target: QueryTarget, children: List<MediaItem>?) {
         when (target) {
             QueryTarget.INITIAL -> {
-                initialLoading = false
                 if (children.isNullOrEmpty()) {
+                    val fallbackPage = findInitialFallbackPage()
+                    if (fallbackPage != null) {
+                        requestInitialPage(fallbackPage)
+                        return
+                    }
+
+                    initialLoading = false
                     feedPageLiveData.value = FeedPageEvent(FeedLoadDirection.INITIAL, Result.Error(201, "无数据"))
                 } else {
+                    initialLoading = false
                     feedPageLiveData.value = FeedPageEvent(FeedLoadDirection.INITIAL, Result.Success(children))
                     ensureCacheFilled(DEFAULT_PREFETCH_PAGE_COUNT)
                 }
@@ -163,16 +177,14 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
             QueryTarget.CACHE -> {
                 activeCacheRequests = max(0, activeCacheRequests - 1)
                 if (children.isNullOrEmpty()) {
-                    val failedDirection = pendingDirections.pollFirst()
-                    if (failedDirection != null) {
-                        lockedDirections.remove(failedDirection)
-                        feedPageLiveData.value = FeedPageEvent(failedDirection, Result.Error(201, "无数据"))
-                    }
+                    failPendingDirection()
+                    clearPendingDirectionsIfCacheDrained()
                     return
                 }
 
                 val direction = pendingDirections.pollFirst()
                 if (direction != null) {
+                    applyingDirections.add(direction)
                     replaceConsumedCachePage()
                     feedPageLiveData.value = FeedPageEvent(direction, Result.Success(children))
                 } else {
@@ -182,6 +194,25 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
                 ensureCacheFilled(DEFAULT_PREFETCH_PAGE_COUNT)
             }
         }
+    }
+
+    private fun findInitialFallbackPage(): Int? {
+        return (0 until INITIAL_FALLBACK_PAGE_COUNT).firstOrNull { page ->
+            page !in requestedInitialPages
+        }
+    }
+
+    private fun failPendingDirection() {
+        val failedDirection = pendingDirections.pollFirst() ?: return
+        feedPageLiveData.value = FeedPageEvent(failedDirection, Result.Error(201, "无数据"))
+    }
+
+    private fun clearPendingDirectionsIfCacheDrained() {
+        if (activeCacheRequests > 0 || cachedPages.isNotEmpty()) {
+            return
+        }
+
+        pendingDirections.clear()
     }
 
     fun release() {
@@ -199,5 +230,7 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
 
     companion object {
         const val DEFAULT_PREFETCH_PAGE_COUNT = 12
+        private const val INITIAL_RANDOM_PAGE_BOUND = 20
+        private const val INITIAL_FALLBACK_PAGE_COUNT = 5
     }
 }

@@ -24,4 +24,12 @@ local.properties
 *.ap_
 *.aab
 *.aar
-apk
+app/release/
+apk/
+
+# Signing keys and private export files
+*.jks
+*.keystore
+*.ks
+*.pepk
+keystore/

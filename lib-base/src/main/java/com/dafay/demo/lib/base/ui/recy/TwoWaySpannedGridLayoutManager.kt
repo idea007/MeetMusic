@@ -321,20 +321,25 @@ open class TwoWaySpannedGridLayoutManager(
             InsertDirection.LEFT -> {
                 val oldLeft = contentBounds.left
                 val newLeft = oldLeft - pageSpans
-                val layoutArea = Rect(newLeft, contentBounds.top, oldLeft, Int.MAX_VALUE)
+                val insertTop = horizontalInsertTop()
+                val layoutArea = Rect(newLeft, insertTop, oldLeft, Int.MAX_VALUE)
                 val bottom = layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.left = newLeft
+                contentBounds.top = min(contentBounds.top, insertTop)
                 contentBounds.bottom = max(contentBounds.bottom, bottom)
             }
 
             InsertDirection.UP,
             InsertDirection.DOWN -> {
-                val height = measureRowsForPositions(positions, contentBounds.width())
+                val layoutArea = verticalInsertArea(contentBounds.top)
+                val height = measureRowsForPositions(positions, layoutArea.width())
                 val oldTop = contentBounds.top
-                val layoutArea = Rect(contentBounds.left, oldTop - height, contentBounds.right, Int.MAX_VALUE)
+                layoutArea.top = oldTop - height
                 layoutPositionsInArea(positions, layoutArea)
 
+                contentBounds.left = min(contentBounds.left, layoutArea.left)
+                contentBounds.right = max(contentBounds.right, layoutArea.right)
                 contentBounds.top = oldTop - height
             }
 
@@ -358,35 +363,44 @@ open class TwoWaySpannedGridLayoutManager(
             InsertDirection.RIGHT -> {
                 val oldRight = contentBounds.right
                 val newRight = oldRight + pageSpans
-                val layoutArea = Rect(oldRight, contentBounds.top, newRight, Int.MAX_VALUE)
+                val insertTop = horizontalInsertTop()
+                val layoutArea = Rect(oldRight, insertTop, newRight, Int.MAX_VALUE)
                 val bottom = layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.right = newRight
+                contentBounds.top = min(contentBounds.top, insertTop)
                 contentBounds.bottom = max(contentBounds.bottom, bottom)
             }
 
             InsertDirection.LEFT -> {
                 val oldLeft = contentBounds.left
                 val newLeft = oldLeft - pageSpans
-                val layoutArea = Rect(newLeft, contentBounds.top, oldLeft, Int.MAX_VALUE)
+                val insertTop = horizontalInsertTop()
+                val layoutArea = Rect(newLeft, insertTop, oldLeft, Int.MAX_VALUE)
                 val bottom = layoutPositionsInArea(positions, layoutArea)
 
                 contentBounds.left = newLeft
+                contentBounds.top = min(contentBounds.top, insertTop)
                 contentBounds.bottom = max(contentBounds.bottom, bottom)
             }
 
             InsertDirection.UP -> {
-                val height = measureRowsForPositions(positions, contentBounds.width())
+                val layoutArea = verticalInsertArea(contentBounds.top)
+                val height = measureRowsForPositions(positions, layoutArea.width())
                 val oldTop = contentBounds.top
-                val layoutArea = Rect(contentBounds.left, oldTop - height, contentBounds.right, Int.MAX_VALUE)
+                layoutArea.top = oldTop - height
                 layoutPositionsInArea(positions, layoutArea)
 
+                contentBounds.left = min(contentBounds.left, layoutArea.left)
+                contentBounds.right = max(contentBounds.right, layoutArea.right)
                 contentBounds.top = oldTop - height
             }
 
             InsertDirection.DOWN -> {
-                val layoutArea = Rect(contentBounds.left, contentBounds.bottom, contentBounds.right, Int.MAX_VALUE)
+                val layoutArea = verticalInsertArea(contentBounds.bottom)
                 contentBounds.bottom = layoutPositionsInArea(positions, layoutArea)
+                contentBounds.left = min(contentBounds.left, layoutArea.left)
+                contentBounds.right = max(contentBounds.right, layoutArea.right)
             }
         }
     }
@@ -876,6 +890,17 @@ open class TwoWaySpannedGridLayoutManager(
         pendingBlankFillAreas.clear()
         val viewport = visibleSpanRect() ?: return
         pendingBlankFillAreas.addAll(findVisibleBlankSpanAreas(viewport))
+    }
+
+    private fun horizontalInsertTop(): Int {
+        return visibleSpanRect()?.top ?: contentBounds.top
+    }
+
+    private fun verticalInsertArea(top: Int): Rect {
+        val viewport = visibleSpanRect()
+        val left = viewport?.left ?: contentBounds.left
+        val right = max(left + visibleSpans, viewport?.right ?: contentBounds.right)
+        return Rect(left, top, right, Int.MAX_VALUE)
     }
 
     private fun findVisibleBlankSpanAreas(viewport: Rect): List<Rect> {
