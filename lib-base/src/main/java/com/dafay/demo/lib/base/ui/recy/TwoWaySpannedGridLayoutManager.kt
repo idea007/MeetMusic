@@ -52,6 +52,8 @@ open class TwoWaySpannedGridLayoutManager(
 
     private val spanFrames = mutableMapOf<Int, Rect>()
     private val contentBounds = Rect(0, 0, 0, 0)
+    private val occupiedBounds = Rect(0, 0, 0, 0)
+    private var occupiedBoundsDirty = true
 
     private var itemSize = 0
     private var scrollX = 0
@@ -63,6 +65,7 @@ open class TwoWaySpannedGridLayoutManager(
     private var dragAxis = DragAxis.NONE
 
     var itemOrderIsStable = false
+    var onScrollBlocked: ((InsertDirection) -> Unit)? = null
 
     var spanSizeLookup: SpanSizeLookup? = null
         set(newValue) {
@@ -267,6 +270,7 @@ open class TwoWaySpannedGridLayoutManager(
 
         contentBounds.bottom = bottom
         knownItemCount = itemCount
+        markOccupiedBoundsDirty()
     }
 
     private fun shiftFramesForInsert(positionStart: Int, itemCount: Int) {
@@ -276,6 +280,7 @@ open class TwoWaySpannedGridLayoutManager(
             val frame = spanFrames.remove(position) ?: continue
             spanFrames[position + itemCount] = frame
         }
+        markOccupiedBoundsDirty()
     }
 
     private fun layoutPrependedFrames(direction: InsertDirection, itemCount: Int) {
@@ -362,6 +367,7 @@ open class TwoWaySpannedGridLayoutManager(
             bottom = max(bottom, spanRect.bottom)
         }
 
+        markOccupiedBoundsDirty()
         return bottom
     }
 
@@ -443,6 +449,8 @@ open class TwoWaySpannedGridLayoutManager(
     private fun clearLayoutState(resetScroll: Boolean) {
         spanFrames.clear()
         contentBounds.set(0, 0, 0, 0)
+        occupiedBounds.set(0, 0, 0, 0)
+        markOccupiedBoundsDirty()
         knownItemCount = 0
         pendingScrollToPosition = null
         pendingAppendDirection = InsertDirection.DOWN
@@ -480,7 +488,20 @@ open class TwoWaySpannedGridLayoutManager(
 
     private fun fillVisibleChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         recycleInvisibleChildren(recycler)
+        fillVisibleChildrenInViewport(recycler, state)
 
+        if (state.itemCount > 0 && spanFrames.isNotEmpty() && !hasVisibleFrameAt(scrollX, scrollY)) {
+            val nearestOffset = findNearestVisibleScrollOffset(scrollX, scrollY) ?: return
+            if (nearestOffset.x != scrollX || nearestOffset.y != scrollY) {
+                scrollX = nearestOffset.x
+                scrollY = nearestOffset.y
+                recycleInvisibleChildren(recycler)
+                fillVisibleChildrenInViewport(recycler, state)
+            }
+        }
+    }
+
+    private fun fillVisibleChildrenInViewport(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         val viewport = visibleContentRect()
         for (position in 0 until state.itemCount) {
             val frame = spanFrames[position] ?: continue
@@ -600,11 +621,17 @@ open class TwoWaySpannedGridLayoutManager(
             (scrollY + delta).coerceIn(minScrollY(), maxScrollY())
         }
         val requestedTravel = targetOffset - currentOffset
-        if (requestedTravel == 0) return 0
+        if (requestedTravel == 0) {
+            notifyScrollBlocked(axis, delta)
+            return 0
+        }
 
         val targetX = if (axis == Axis.HORIZONTAL) targetOffset else scrollX
         val targetY = if (axis == Axis.VERTICAL) targetOffset else scrollY
         if (hasVisibleFrameAt(targetX, targetY)) {
+            if (requestedTravel != delta) {
+                notifyScrollBlocked(axis, delta)
+            }
             return requestedTravel
         }
 
@@ -627,7 +654,18 @@ open class TwoWaySpannedGridLayoutManager(
             }
         }
 
+        if (bestTravel != requestedTravel) {
+            notifyScrollBlocked(axis, delta)
+        }
         return bestTravel
+    }
+
+    private fun notifyScrollBlocked(axis: Axis, delta: Int) {
+        val direction = when (axis) {
+            Axis.HORIZONTAL -> if (delta > 0) InsertDirection.RIGHT else InsertDirection.LEFT
+            Axis.VERTICAL -> if (delta > 0) InsertDirection.DOWN else InsertDirection.UP
+        }
+        onScrollBlocked?.invoke(direction)
     }
 
     private fun hasVisibleFrameAt(candidateScrollX: Int, candidateScrollY: Int): Boolean {
@@ -788,25 +826,54 @@ open class TwoWaySpannedGridLayoutManager(
         get() = max(0, height - paddingTop - paddingBottom)
 
     private val contentWidth: Int
-        get() = max(horizontalSpace, contentBounds.width() * itemSize)
+        get() = max(horizontalSpace, occupiedSpanBounds().width() * itemSize)
 
     private val contentHeight: Int
-        get() = max(verticalSpace, contentBounds.height() * itemSize)
+        get() = max(verticalSpace, occupiedSpanBounds().height() * itemSize)
 
     private fun minScrollX(): Int {
-        return contentBounds.left * itemSize
+        return occupiedSpanBounds().left * itemSize
     }
 
     private fun maxScrollX(): Int {
-        return max(minScrollX(), contentBounds.right * itemSize - horizontalSpace)
+        return max(minScrollX(), occupiedSpanBounds().right * itemSize - horizontalSpace)
     }
 
     private fun minScrollY(): Int {
-        return contentBounds.top * itemSize
+        return occupiedSpanBounds().top * itemSize
     }
 
     private fun maxScrollY(): Int {
-        return max(minScrollY(), contentBounds.bottom * itemSize - verticalSpace)
+        return max(minScrollY(), occupiedSpanBounds().bottom * itemSize - verticalSpace)
+    }
+
+    private fun occupiedSpanBounds(): Rect {
+        if (!occupiedBoundsDirty) {
+            return occupiedBounds
+        }
+
+        if (spanFrames.isEmpty()) {
+            occupiedBounds.set(contentBounds)
+            occupiedBoundsDirty = false
+            return occupiedBounds
+        }
+
+        var isFirstFrame = true
+        for (frame in spanFrames.values) {
+            if (isFirstFrame) {
+                occupiedBounds.set(frame)
+                isFirstFrame = false
+            } else {
+                occupiedBounds.union(frame)
+            }
+        }
+
+        occupiedBoundsDirty = false
+        return occupiedBounds
+    }
+
+    private fun markOccupiedBoundsDirty() {
+        occupiedBoundsDirty = true
     }
 
     private fun Rect.toPixelRect(): Rect {

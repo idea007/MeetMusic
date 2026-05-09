@@ -74,6 +74,11 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
         binding.rvRecyclerview.addItemDecoration(GridMarginDecoration(4.dp2px, 4.dp2px, 4.dp2px, 4.dp2px))
         binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
         binding.rvRecyclerview.adapter = feedAdapter
+        spannedGridLayoutManager.onScrollBlocked = { direction ->
+            if (::viewModel.isInitialized && feedAdapter.datas.isNotEmpty()) {
+                viewModel.loadMore(direction.toFeedLoadDirection())
+            }
+        }
 
         spannedGridLayoutManager.spanSizeLookup = TwoWaySpannedGridLayoutManager.SpanSizeLookup { position ->
             when (position % 4) {
@@ -252,6 +257,15 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
         }
     }
 
+    private fun TwoWaySpannedGridLayoutManager.InsertDirection.toFeedLoadDirection(): FeedLoadDirection {
+        return when (this) {
+            TwoWaySpannedGridLayoutManager.InsertDirection.LEFT -> FeedLoadDirection.LEFT
+            TwoWaySpannedGridLayoutManager.InsertDirection.UP -> FeedLoadDirection.UP
+            TwoWaySpannedGridLayoutManager.InsertDirection.RIGHT -> FeedLoadDirection.RIGHT
+            TwoWaySpannedGridLayoutManager.InsertDirection.DOWN -> FeedLoadDirection.DOWN
+        }
+    }
+
     private fun refreshInitialDataIfNeeded() {
         if (initialRefreshRequested || feedAdapter.datas.isNotEmpty()) {
             return
@@ -272,6 +286,9 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     }
 
     override fun onDestroyView() {
+        if (::spannedGridLayoutManager.isInitialized) {
+            spannedGridLayoutManager.onScrollBlocked = null
+        }
         browser?.removeListener(playerListener)
         playerListenerAdded = false
         playingBarsDrawable.stop()
