@@ -12,6 +12,7 @@ import android.util.SparseArray
 import android.view.View
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -194,6 +195,7 @@ open class TwoWaySpannedGridLayoutManager(
         ensureFramesForItemCount(state.itemCount)
         applyPendingScrollPosition()
         clampScrollOffsets()
+        clampScrollOffsetsToVisibleFrame()
 
         detachAndScrapAttachedViews(recycler)
         fillVisibleChildren(recycler, state)
@@ -466,6 +468,16 @@ open class TwoWaySpannedGridLayoutManager(
         scrollY = scrollY.coerceIn(minScrollY(), maxScrollY())
     }
 
+    private fun clampScrollOffsetsToVisibleFrame() {
+        if (spanFrames.isEmpty() || itemSize <= 0 || hasVisibleFrameAt(scrollX, scrollY)) {
+            return
+        }
+
+        val nearestOffset = findNearestVisibleScrollOffset(scrollX, scrollY) ?: return
+        scrollX = nearestOffset.x
+        scrollY = nearestOffset.y
+    }
+
     private fun fillVisibleChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
         recycleInvisibleChildren(recycler)
 
@@ -564,15 +576,132 @@ open class TwoWaySpannedGridLayoutManager(
     }
 
     private fun scrollBy(delta: Int, axis: Axis): Int {
-        return if (axis == Axis.HORIZONTAL) {
-            val previous = scrollX
-            scrollX = (scrollX + delta).coerceIn(minScrollX(), maxScrollX())
-            scrollX - previous
-        } else {
-            val previous = scrollY
-            scrollY = (scrollY + delta).coerceIn(minScrollY(), maxScrollY())
-            scrollY - previous
+        val travelled = findAllowedTravel(delta, axis)
+        if (travelled == 0) {
+            return 0
         }
+
+        if (axis == Axis.HORIZONTAL) {
+            scrollX += travelled
+        } else {
+            scrollY += travelled
+        }
+
+        return travelled
+    }
+
+    private fun findAllowedTravel(delta: Int, axis: Axis): Int {
+        if (delta == 0) return 0
+
+        val currentOffset = if (axis == Axis.HORIZONTAL) scrollX else scrollY
+        val targetOffset = if (axis == Axis.HORIZONTAL) {
+            (scrollX + delta).coerceIn(minScrollX(), maxScrollX())
+        } else {
+            (scrollY + delta).coerceIn(minScrollY(), maxScrollY())
+        }
+        val requestedTravel = targetOffset - currentOffset
+        if (requestedTravel == 0) return 0
+
+        val targetX = if (axis == Axis.HORIZONTAL) targetOffset else scrollX
+        val targetY = if (axis == Axis.VERTICAL) targetOffset else scrollY
+        if (hasVisibleFrameAt(targetX, targetY)) {
+            return requestedTravel
+        }
+
+        val direction = requestedTravel.compareTo(0)
+        var low = 0
+        var high = abs(requestedTravel)
+        var bestTravel = 0
+
+        while (low <= high) {
+            val middle = (low + high) / 2
+            val candidateTravel = direction * middle
+            val candidateX = if (axis == Axis.HORIZONTAL) scrollX + candidateTravel else scrollX
+            val candidateY = if (axis == Axis.VERTICAL) scrollY + candidateTravel else scrollY
+
+            if (middle == 0 || hasVisibleFrameAt(candidateX, candidateY)) {
+                bestTravel = candidateTravel
+                low = middle + 1
+            } else {
+                high = middle - 1
+            }
+        }
+
+        return bestTravel
+    }
+
+    private fun hasVisibleFrameAt(candidateScrollX: Int, candidateScrollY: Int): Boolean {
+        if (horizontalSpace <= 0 || verticalSpace <= 0) return true
+
+        val viewport = Rect(
+            candidateScrollX,
+            candidateScrollY,
+            candidateScrollX + horizontalSpace,
+            candidateScrollY + verticalSpace
+        )
+
+        for (frame in spanFrames.values) {
+            if (viewport.intersects(frame.toPixelRect())) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private fun findNearestVisibleScrollOffset(candidateScrollX: Int, candidateScrollY: Int): ScrollOffset? {
+        if (horizontalSpace <= 0 || verticalSpace <= 0) return null
+
+        var nearestOffset: ScrollOffset? = null
+        var nearestDistance = Long.MAX_VALUE
+
+        for (frame in spanFrames.values) {
+            val pixelFrame = frame.toPixelRect()
+            val targetX = nearestViewportOffsetForFrame(
+                frameStart = pixelFrame.left,
+                frameEnd = pixelFrame.right,
+                viewportStart = candidateScrollX,
+                viewportSize = horizontalSpace,
+                minOffset = minScrollX(),
+                maxOffset = maxScrollX()
+            )
+            val targetY = nearestViewportOffsetForFrame(
+                frameStart = pixelFrame.top,
+                frameEnd = pixelFrame.bottom,
+                viewportStart = candidateScrollY,
+                viewportSize = verticalSpace,
+                minOffset = minScrollY(),
+                maxOffset = maxScrollY()
+            )
+            val distanceX = targetX - candidateScrollX
+            val distanceY = targetY - candidateScrollY
+            val distance = distanceX.toLong() * distanceX + distanceY.toLong() * distanceY
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance
+                nearestOffset = ScrollOffset(targetX, targetY)
+            }
+        }
+
+        return nearestOffset
+    }
+
+    private fun nearestViewportOffsetForFrame(
+        frameStart: Int,
+        frameEnd: Int,
+        viewportStart: Int,
+        viewportSize: Int,
+        minOffset: Int,
+        maxOffset: Int
+    ): Int {
+        val viewportEnd = viewportStart + viewportSize
+        val offset = when {
+            frameEnd <= viewportStart -> frameEnd - viewportSize
+            frameStart >= viewportEnd -> frameStart
+            else -> viewportStart
+        }
+
+        return offset.coerceIn(minOffset, maxOffset)
     }
 
     override fun scrollToPosition(position: Int) {
@@ -692,6 +821,11 @@ open class TwoWaySpannedGridLayoutManager(
         val position: Int,
         val left: Int,
         val top: Int
+    )
+
+    private data class ScrollOffset(
+        val x: Int,
+        val y: Int
     )
 
     class SavedState(val scrollX: Int, val scrollY: Int) : Parcelable {
