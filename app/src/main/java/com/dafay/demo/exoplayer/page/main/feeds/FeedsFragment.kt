@@ -1,14 +1,13 @@
 package com.dafay.demo.exoplayer.page.main.feeds
 
-import android.annotation.SuppressLint
 import android.content.ComponentName
-import android.view.MotionEvent
+import android.content.Intent
 import android.view.View
-import android.view.ViewConfiguration
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnNextLayout
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.RecyclerView
@@ -17,12 +16,14 @@ import com.arasthel.spannedgridlayoutmanager.TwoWaySpannedGridLayoutManager
 import com.dafay.demo.data.source.data.Result
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.databinding.FragmentFeedsBinding
+import com.dafay.demo.exoplayer.page.player.NowPlayingActivity
+import com.dafay.demo.exoplayer.ui.PlayingBarsDrawable
 import com.dafay.demo.lab.base.base.BaseFragment
 import com.dafay.demo.lib.base.utils.debug
 import com.dafay.demo.lib.base.utils.dp2px
 import com.example.demo.biz.base.widgets.GridMarginDecoration
 import com.google.common.util.concurrent.ListenableFuture
-import kotlin.math.abs
+import com.google.android.material.color.MaterialColors
 
 class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::inflate) {
 
@@ -30,19 +31,28 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     private val browser: MediaBrowser? get() = if (browserFuture.isDone && !browserFuture.isCancelled) browserFuture.get() else null
 
     private lateinit var feedAdapter: FeedAdapter
+    private val playingBarsDrawable = PlayingBarsDrawable()
 
     private lateinit var viewModel: FeedsViewModel
     private lateinit var spannedGridLayoutManager: TwoWaySpannedGridLayoutManager
     private var observerInitialized = false
     private var initialRefreshRequested = false
-    private var touchDownX = 0f
-    private var touchDownY = 0f
-    private var dragAxisLocked = false
+    private var wasDragging = false
+    private var playerListenerAdded = false
+
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updateNowPlayingFab(isPlaying)
+        }
+    }
 
     override fun onStart() {
         super.onStart()
         if (::viewModel.isInitialized) {
             delayInitObserver()
+            browser?.let {
+                attachPlayerListener(it)
+            }
         } else {
             initializeBrowser()
         }
@@ -60,6 +70,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             contentSpans = 8,
             pageSpans = 4
         )
+        initNowPlayingFab()
         binding.rvRecyclerview.addItemDecoration(GridMarginDecoration(4.dp2px, 4.dp2px, 4.dp2px, 4.dp2px))
         binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
         binding.rvRecyclerview.adapter = feedAdapter
@@ -96,13 +107,23 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             }
 
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    spannedGridLayoutManager.snapToNearestSpan(recyclerView)
-                    spannedGridLayoutManager.clearDragAxis()
+                when (newState) {
+                    RecyclerView.SCROLL_STATE_DRAGGING -> {
+                        wasDragging = true
+                    }
+
+                    RecyclerView.SCROLL_STATE_IDLE -> {
+                        spannedGridLayoutManager.snapToNearestSpan(recyclerView)
+                        spannedGridLayoutManager.clearDragAxis()
+
+                        if (wasDragging && ::viewModel.isInitialized && feedAdapter.datas.isNotEmpty()) {
+                            viewModel.prefetchAround(FeedsViewModel.DEFAULT_PREFETCH_PAGE_COUNT)
+                        }
+                        wasDragging = false
+                    }
                 }
             }
         })
-        bindDragAxisLock()
 
         feedAdapter.onItemClickListener = object : FeedAdapter.AlbumViewHolder.OnItemClickListener {
             override fun onClickItem(view: View, position: Int, mediaItem: MediaItem) {
@@ -127,45 +148,16 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun bindDragAxisLock() {
-        val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
-
-        binding.rvRecyclerview.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    touchDownX = event.x
-                    touchDownY = event.y
-                    dragAxisLocked = false
-                    spannedGridLayoutManager.clearDragAxis()
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-                    if (!dragAxisLocked) {
-                        val dx = event.x - touchDownX
-                        val dy = event.y - touchDownY
-                        val absDx = abs(dx)
-                        val absDy = abs(dy)
-
-                        if (absDx > touchSlop || absDy > touchSlop) {
-                            val axis = if (absDx >= absDy) {
-                                TwoWaySpannedGridLayoutManager.DragAxis.HORIZONTAL
-                            } else {
-                                TwoWaySpannedGridLayoutManager.DragAxis.VERTICAL
-                            }
-                            spannedGridLayoutManager.setDragAxis(axis)
-                            dragAxisLocked = true
-                        }
-                    }
-                }
-
-                MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_CANCEL -> {
-                    dragAxisLocked = false
-                }
-            }
-
-            false
+    private fun initNowPlayingFab() {
+        val iconColor = MaterialColors.getColor(
+            binding.fabNowPlaying,
+            com.google.android.material.R.attr.colorOnPrimary
+        )
+        playingBarsDrawable.setBarColor(iconColor)
+        binding.fabNowPlaying.setImageDrawable(playingBarsDrawable)
+        binding.fabNowPlaying.hide()
+        binding.fabNowPlaying.setOnClickListener {
+            startActivity(Intent(requireContext(), NowPlayingActivity::class.java))
         }
     }
 
@@ -182,9 +174,32 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             debug("initializeBrowser success")
             val mediaBrowser = browser ?: return@addListener
             viewModel = FeedsViewModel(mediaBrowser)
+            attachPlayerListener(mediaBrowser)
             delayInitObserver()
             refreshInitialDataIfNeeded()
         }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+    private fun attachPlayerListener(mediaBrowser: MediaBrowser) {
+        if (!playerListenerAdded) {
+            mediaBrowser.addListener(playerListener)
+            playerListenerAdded = true
+        }
+        updateNowPlayingFab(mediaBrowser.isPlaying)
+    }
+
+    private fun updateNowPlayingFab(isPlaying: Boolean) {
+        if (view == null) return
+
+        if (isPlaying) {
+            if (!playingBarsDrawable.isRunning) {
+                playingBarsDrawable.start()
+            }
+            binding.fabNowPlaying.show()
+        } else {
+            binding.fabNowPlaying.hide()
+            playingBarsDrawable.stop()
+        }
     }
 
     private fun delayInitObserver() {
@@ -209,8 +224,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             FeedLoadDirection.INITIAL -> {
                 feedAdapter.setDatas(mediaItems)
                 binding.rvRecyclerview.doOnNextLayout {
-                    viewModel.loadMore(FeedLoadDirection.UP)
-                    viewModel.loadMore(FeedLoadDirection.LEFT)
+                    viewModel.prefetchAround(FeedsViewModel.DEFAULT_PREFETCH_PAGE_COUNT)
                 }
             }
 
@@ -258,6 +272,9 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     }
 
     override fun onDestroyView() {
+        browser?.removeListener(playerListener)
+        playerListenerAdded = false
+        playingBarsDrawable.stop()
         observerInitialized = false
         super.onDestroyView()
     }

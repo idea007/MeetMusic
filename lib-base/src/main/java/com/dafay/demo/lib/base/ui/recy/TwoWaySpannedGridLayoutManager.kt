@@ -202,10 +202,23 @@ open class TwoWaySpannedGridLayoutManager(
     override fun onItemsAdded(recyclerView: RecyclerView, positionStart: Int, itemCount: Int) {
         if (itemCount <= 0) return
 
-        val direction = if (positionStart == 0) pendingPrependDirection else pendingAppendDirection
-        val anchor = captureAnchor(if (positionStart == 0) itemCount else 0)
-        growContentBounds(direction, itemCount, positionStart == 0)
-        rebuildFrames(knownItemCount + itemCount)
+        val isPrepend = positionStart == 0
+        val isAppend = positionStart >= knownItemCount
+        val direction = if (isPrepend) pendingPrependDirection else pendingAppendDirection
+        val anchor = captureAnchor(if (isPrepend) itemCount else 0)
+
+        if (spanFrames.isEmpty() || knownItemCount == 0 || (!isPrepend && !isAppend)) {
+            growContentBounds(direction, itemCount, isPrepend)
+            rebuildFrames(knownItemCount + itemCount)
+        } else if (isPrepend) {
+            shiftFramesForInsert(positionStart, itemCount)
+            layoutPrependedFrames(direction, itemCount)
+            knownItemCount += itemCount
+        } else {
+            layoutAppendedFrames(direction, positionStart, itemCount)
+            knownItemCount += itemCount
+        }
+
         restoreAnchor(anchor)
         requestLayout()
     }
@@ -252,6 +265,119 @@ open class TwoWaySpannedGridLayoutManager(
 
         contentBounds.bottom = bottom
         knownItemCount = itemCount
+    }
+
+    private fun shiftFramesForInsert(positionStart: Int, itemCount: Int) {
+        if (itemCount <= 0) return
+
+        for (position in knownItemCount - 1 downTo positionStart) {
+            val frame = spanFrames.remove(position) ?: continue
+            spanFrames[position + itemCount] = frame
+        }
+    }
+
+    private fun layoutPrependedFrames(direction: InsertDirection, itemCount: Int) {
+        ensureInitialContentBounds()
+
+        when (direction) {
+            InsertDirection.LEFT -> {
+                val oldLeft = contentBounds.left
+                val newLeft = oldLeft - pageSpans
+                val layoutArea = Rect(newLeft, contentBounds.top, oldLeft, Int.MAX_VALUE)
+                val bottom = layoutFramesInArea(0, itemCount, layoutArea)
+
+                contentBounds.left = newLeft
+                contentBounds.bottom = max(contentBounds.bottom, bottom)
+            }
+
+            InsertDirection.UP,
+            InsertDirection.DOWN -> {
+                val height = measureRowsForItems(0, itemCount, contentBounds.width())
+                val oldTop = contentBounds.top
+                val layoutArea = Rect(contentBounds.left, oldTop - height, contentBounds.right, Int.MAX_VALUE)
+                layoutFramesInArea(0, itemCount, layoutArea)
+
+                contentBounds.top = oldTop - height
+            }
+
+            InsertDirection.RIGHT -> {
+                layoutAppendedFrames(InsertDirection.RIGHT, 0, itemCount)
+            }
+        }
+    }
+
+    private fun layoutAppendedFrames(direction: InsertDirection, positionStart: Int, itemCount: Int) {
+        ensureInitialContentBounds()
+
+        when (direction) {
+            InsertDirection.RIGHT -> {
+                val oldRight = contentBounds.right
+                val newRight = oldRight + pageSpans
+                val layoutArea = Rect(oldRight, contentBounds.top, newRight, Int.MAX_VALUE)
+                val bottom = layoutFramesInArea(positionStart, itemCount, layoutArea)
+
+                contentBounds.right = newRight
+                contentBounds.bottom = max(contentBounds.bottom, bottom)
+            }
+
+            InsertDirection.LEFT -> {
+                val oldLeft = contentBounds.left
+                val newLeft = oldLeft - pageSpans
+                val layoutArea = Rect(newLeft, contentBounds.top, oldLeft, Int.MAX_VALUE)
+                val bottom = layoutFramesInArea(positionStart, itemCount, layoutArea)
+
+                contentBounds.left = newLeft
+                contentBounds.bottom = max(contentBounds.bottom, bottom)
+            }
+
+            InsertDirection.UP -> {
+                val height = measureRowsForItems(positionStart, itemCount, contentBounds.width())
+                val oldTop = contentBounds.top
+                val layoutArea = Rect(contentBounds.left, oldTop - height, contentBounds.right, Int.MAX_VALUE)
+                layoutFramesInArea(positionStart, itemCount, layoutArea)
+
+                contentBounds.top = oldTop - height
+            }
+
+            InsertDirection.DOWN -> {
+                val layoutArea = Rect(contentBounds.left, contentBounds.bottom, contentBounds.right, Int.MAX_VALUE)
+                contentBounds.bottom = layoutFramesInArea(positionStart, itemCount, layoutArea)
+            }
+        }
+    }
+
+    private fun layoutFramesInArea(positionStart: Int, itemCount: Int, layoutArea: Rect): Int {
+        val rectsHelper = TwoWayRectsHelper(layoutArea)
+        var bottom = layoutArea.top
+
+        for (position in positionStart until positionStart + itemCount) {
+            val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
+            validateSpanSize(spanSize, layoutArea.width())
+
+            val spanRect = rectsHelper.findRect(spanSize)
+            rectsHelper.pushRect(spanRect)
+            spanFrames[position] = spanRect
+            bottom = max(bottom, spanRect.bottom)
+        }
+
+        return bottom
+    }
+
+    private fun measureRowsForItems(positionStart: Int, itemCount: Int, widthSpans: Int): Int {
+        val layoutArea = Rect(0, 0, max(1, widthSpans), Int.MAX_VALUE)
+        val rectsHelper = TwoWayRectsHelper(layoutArea)
+        var bottom = layoutArea.top
+
+        for (position in positionStart until positionStart + itemCount) {
+            val spanSize = spanSizeLookup?.getSpanSize(position) ?: SpanSize(1, 1)
+            validateSpanSize(spanSize, layoutArea.width())
+
+            val spanRect = rectsHelper.findRect(spanSize)
+            rectsHelper.pushRect(spanRect)
+            bottom = max(bottom, spanRect.bottom)
+        }
+
+        return max(1, bottom - layoutArea.top)
     }
 
     private fun ensureInitialContentBounds() {
