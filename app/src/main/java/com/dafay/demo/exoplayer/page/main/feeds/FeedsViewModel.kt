@@ -70,7 +70,7 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
     private fun query(page: Int, direction: FeedLoadDirection) {
         feedPageLiveData.postValue(FeedPageEvent(direction, Result.Loading))
 
-        val pageSize = PAGE.PAGE_SIZE_THIRTY
+        val pageSize = PAGE.PAGE_SIZE_FIFTY
         val params = MediaLibraryService.LibraryParams.Builder().setExtras(Bundle().apply {
             putString("des", "get album songs")
             putString("action", "feed")

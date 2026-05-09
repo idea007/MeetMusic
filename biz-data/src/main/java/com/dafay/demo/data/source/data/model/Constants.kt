@@ -12,5 +12,6 @@ object PAGE {
     val PAGE_SIZE_TEN = 10
     val PAGE_SIZE_TWENTY = 20
     val PAGE_SIZE_THIRTY = 30
+    val PAGE_SIZE_FIFTY = 50
 }
 
