@@ -22,6 +22,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.dafay.demo.biz.settings.base.BaseThemeActivity
 import com.dafay.demo.biz.settings.databinding.ActivitySettingsBinding
 import com.dafay.demo.biz.settings.fragment.SelectDarkModeBottomSheetDialogFragment
+import com.dafay.demo.biz.settings.fragment.SelectHomeFeedSpanBottomSheetDialogFragment
 import com.dafay.demo.biz.settings.fragment.SelectLanguageBottomSheetDialogFragment
 import com.dafay.demo.biz.settings.fragment.SelectPictureQualityBottomSheetDialogFragment
 import com.dafay.demo.biz.settings.helper.CommonMessage
@@ -158,6 +159,19 @@ class SettingsActivity : BaseThemeActivity<ActivitySettingsBinding>(ActivitySett
 
         setUpThemeSelection()
 
+        binding.itemHomeFeedSpanCount.apply {
+            binding.ivIcon.setImageResource(R.drawable.vector_grid_view_24dp)
+            binding.tvTitle.text = getString(R.string.home_feed_span_count)
+            updateHomeFeedSpanCount()
+            binding.mcvCard.setOnClickListener {
+                SelectHomeFeedSpanBottomSheetDialogFragment(object : SelectHomeFeedSpanBottomSheetDialogFragment.SpanCountChangeCallback {
+                    override fun onSpanCountChange(spanCount: Int) {
+                        updateHomeFeedSpanCount(spanCount)
+                    }
+                }).show(supportFragmentManager, null)
+            }
+        }
+
         // item Vibrator
         binding.itemVibrator.apply {
             binding.ivIcon.setImageResource(R.drawable.vector_edgesensor_low_24dp)
@@ -258,6 +272,15 @@ class SettingsActivity : BaseThemeActivity<ActivitySettingsBinding>(ActivitySett
             }
         }
 
+    }
+
+    private fun updateHomeFeedSpanCount(
+        spanCount: Int = SPUtils.findPreference(PrefC.HOME_FEED_SPAN_COUNT, DefC.HOME_FEED_SPAN_COUNT)
+    ) {
+        binding.itemHomeFeedSpanCount.binding.tvDes.text = getString(
+            R.string.home_feed_span_count_value,
+            spanCount.coerceIn(DefC.HOME_FEED_MIN_SPAN_COUNT, DefC.HOME_FEED_MAX_SPAN_COUNT)
+        )
     }
 
     private fun updateVibratorState() {

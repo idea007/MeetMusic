@@ -72,6 +72,11 @@
             </HorizontalScrollView>
 
             <com.dafay.demo.biz.settings.view.SettingsItemUniteView
+                android:id="@+id/item_home_feed_span_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.dafay.demo.biz.settings.view.SettingsItemUniteView
                 android:id="@+id/item_vibrator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />

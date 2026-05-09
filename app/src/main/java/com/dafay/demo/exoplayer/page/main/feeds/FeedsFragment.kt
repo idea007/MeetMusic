@@ -13,12 +13,15 @@ import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.RecyclerView
 import com.arasthel.spannedgridlayoutmanager.SpanSize
 import com.arasthel.spannedgridlayoutmanager.TwoWaySpannedGridLayoutManager
+import com.dafay.demo.biz.settings.DefC
+import com.dafay.demo.biz.settings.PrefC
 import com.dafay.demo.data.source.data.Result
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.databinding.FragmentFeedsBinding
 import com.dafay.demo.exoplayer.page.player.NowPlayingActivity
 import com.dafay.demo.exoplayer.ui.PlayingBarsDrawable
 import com.dafay.demo.lib.base.base.BaseFragment
+import com.dafay.demo.lib.base.storage.sp.SPUtils
 import com.dafay.demo.lib.base.ui.itemdecoration.GridMarginDecoration
 import com.dafay.demo.lib.base.utils.debug
 import com.dafay.demo.lib.base.utils.dp2px
@@ -45,6 +48,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     private var initialRefreshRequested = false
     private var wasDragging = false
     private var playerListenerAdded = false
+    private var currentSpanCount = DefC.HOME_FEED_SPAN_COUNT
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -64,6 +68,11 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateSpanCountIfNeeded()
+    }
+
     override fun initViews() {
         super.initViews()
         initRecyclerView()
@@ -71,30 +80,13 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
 
     private fun initRecyclerView() {
         feedAdapter = FeedAdapter()
-        spannedGridLayoutManager = TwoWaySpannedGridLayoutManager(
-            visibleSpans = 4,
-            contentSpans = 8,
-            pageSpans = 4
-        )
+        currentSpanCount = readHomeFeedSpanCount()
+        spannedGridLayoutManager = createLayoutManager(currentSpanCount)
         initNowPlayingFab()
         binding.rvRecyclerview.addItemDecoration(GridMarginDecoration(4.dp2px, 4.dp2px, 4.dp2px, 4.dp2px))
         binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
         binding.rvRecyclerview.adapter = feedAdapter
-        spannedGridLayoutManager.onScrollBlocked = { direction ->
-            requestLoadMore(direction.toFeedLoadDirection())
-        }
-
-        spannedGridLayoutManager.spanSizeLookup = TwoWaySpannedGridLayoutManager.SpanSizeLookup { position ->
-            when (position % 4) {
-                0 -> {
-                    SpanSize(2, 2)
-                }
-
-                else -> {
-                    SpanSize(1, 1)
-                }
-            }
-        }
+        configureLayoutManager()
 
         binding.rvRecyclerview.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -155,6 +147,52 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
                 }
             }
         }
+    }
+
+    private fun createLayoutManager(spanCount: Int): TwoWaySpannedGridLayoutManager {
+        return TwoWaySpannedGridLayoutManager(
+            visibleSpans = spanCount,
+            contentSpans = spanCount * 2,
+            pageSpans = spanCount
+        )
+    }
+
+    private fun configureLayoutManager() {
+        spannedGridLayoutManager.onScrollBlocked = { direction ->
+            requestLoadMore(direction.toFeedLoadDirection())
+        }
+
+        spannedGridLayoutManager.spanSizeLookup = TwoWaySpannedGridLayoutManager.SpanSizeLookup { position ->
+            when (position % 4) {
+                0 -> SpanSize(2, 2)
+                else -> SpanSize(1, 1)
+            }
+        }
+    }
+
+    private fun updateSpanCountIfNeeded() {
+        if (view == null || !::spannedGridLayoutManager.isInitialized || !::feedAdapter.isInitialized) {
+            return
+        }
+
+        val spanCount = readHomeFeedSpanCount()
+        if (spanCount == currentSpanCount) {
+            return
+        }
+
+        currentSpanCount = spanCount
+        spannedGridLayoutManager.onScrollBlocked = null
+        spannedGridLayoutManager = createLayoutManager(spanCount)
+        configureLayoutManager()
+        binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
+        binding.rvRecyclerview.post {
+            scheduleBlankFillAndPrefetch()
+        }
+    }
+
+    private fun readHomeFeedSpanCount(): Int {
+        return SPUtils.findPreference(PrefC.HOME_FEED_SPAN_COUNT, DefC.HOME_FEED_SPAN_COUNT)
+            .coerceIn(DefC.HOME_FEED_MIN_SPAN_COUNT, DefC.HOME_FEED_MAX_SPAN_COUNT)
     }
 
     private fun initNowPlayingFab() {

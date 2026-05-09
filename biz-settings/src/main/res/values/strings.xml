@@ -15,6 +15,8 @@
     <string name="current_mode_follow_system">Follow the system</string>
 
     <string name="color_theme">Theme color</string>
+    <string name="home_feed_span_count">Home list spans</string>
+    <string name="home_feed_span_count_value">%1$d spans</string>
     <string name="vibrator_mode">Vibrator</string>
     <string name="system_haptics_turnedoff">System haptics turned off</string>
 

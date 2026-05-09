@@ -121,6 +121,8 @@ class NowPlayingActivity : BaseThemeActivity<ActivityNowPlayingBinding>(Activity
                             this.recreate()
                         }
                     }
+
+                    CommonMessage.Type.CHANGE_HOME_FEED_SPAN_COUNT -> Unit
                 }
             })
     }
@@ -311,5 +313,4 @@ class NowPlayingActivity : BaseThemeActivity<ActivityNowPlayingBinding>(Activity
         binding.sbSeek.disconnectController()
     }
 }
-
 

@@ -11,6 +11,7 @@ object PrefC {
     val LANGUAGE: String = "language"
     val DARK_MODE: String = "dark_mode"
     val VIBRATOR_STATE: String = "vibrator_state"
+    val HOME_FEED_SPAN_COUNT: String = "home_feed_span_count"
 
 
     val PHOTO_QUALITY_DOWNLAOD: String = "photo_quality_downlaod"
@@ -19,6 +20,9 @@ object PrefC {
 // sp default
 object DefC {
     val THEME: String = ""
+    const val HOME_FEED_SPAN_COUNT = 4
+    const val HOME_FEED_MIN_SPAN_COUNT = 2
+    const val HOME_FEED_MAX_SPAN_COUNT = 5
 }
 
 
