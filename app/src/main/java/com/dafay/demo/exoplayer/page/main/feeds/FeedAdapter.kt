@@ -2,13 +2,11 @@ package com.dafay.demo.exoplayer.page.main.feeds
 
 import android.annotation.SuppressLint
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.media3.common.MediaItem
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
@@ -37,16 +35,8 @@ class FeedAdapter : BaseAdapter<MediaItem>() {
 
     var onItemClickListener: AlbumViewHolder.OnItemClickListener? = null
 
-    init {
-        setHasStableIds(true)
-    }
-
-    override fun getItemId(position: Int): Long {
-        return position.toLong()
-    }
-
     override fun getItemViewType(position: Int): Int {
-        return position
+        return 0
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -57,6 +47,13 @@ class FeedAdapter : BaseAdapter<MediaItem>() {
         if (holder is AlbumViewHolder) {
             holder.onBindViewHolder(position, datas[position], onItemClickListener)
         }
+    }
+
+    fun prependDatas(newDatas: List<MediaItem>) {
+        if (newDatas.isEmpty()) return
+
+        datas.addAll(0, newDatas)
+        notifyItemRangeInserted(0, newDatas.size)
     }
 
 

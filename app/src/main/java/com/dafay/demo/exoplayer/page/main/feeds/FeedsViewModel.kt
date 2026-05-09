@@ -10,42 +10,68 @@ import androidx.media3.session.MediaLibraryService
 import com.dafay.demo.data.source.data.Result
 import com.example.demo.meetsplash.data.model.PAGE
 import java.util.concurrent.Executors
+import kotlin.math.max
 import kotlin.random.Random
 
-/**
- * @Des
- * @Author dafay
- * @Date 2024/8/29
- * <a href=" ">相关链接</a>
- */
+enum class FeedLoadDirection {
+    INITIAL, LEFT, UP, RIGHT, DOWN
+}
+
+data class FeedPageEvent(
+    val direction: FeedLoadDirection,
+    val result: Result<List<MediaItem>>
+)
+
 class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
-    private var curPageIndex = 0
-    val refreshMediaItemsLiveData = MutableLiveData<Result<List<MediaItem>>>()
-    val loadmoreMediaItemsLiveData = MutableLiveData<Result<List<MediaItem>>>()
+    private val queryExecutor = Executors.newSingleThreadExecutor()
+    private val loadingDirections = mutableSetOf<FeedLoadDirection>()
+    private var nextForwardPage = 0
+    private var nextBackwardPage = 0
+
+    val feedPageLiveData = MutableLiveData<FeedPageEvent>()
 
     fun refresh() {
-        if (refreshMediaItemsLiveData.value is Result.Loading) {
+        if (!loadingDirections.add(FeedLoadDirection.INITIAL)) {
             return
         }
-        refreshMediaItemsLiveData.postValue(Result.Loading)
-        curPageIndex = Random.nextInt(0,100)*100
-        query(curPageIndex, PAGE.PAGE_SIZE_THIRTY, refreshMediaItemsLiveData)
+
+        val startPage = Random.nextInt(0, 100) * 100
+        nextForwardPage = startPage + 1
+        nextBackwardPage = max(0, startPage - 1)
+        query(startPage, FeedLoadDirection.INITIAL)
     }
 
-
-    fun loadMore() {
-        if (loadmoreMediaItemsLiveData.value is Result.Loading) {
+    fun loadMore(direction: FeedLoadDirection) {
+        if (direction == FeedLoadDirection.INITIAL || !loadingDirections.add(direction)) {
             return
         }
-        loadmoreMediaItemsLiveData.postValue(Result.Loading)
-        query(curPageIndex, PAGE.PAGE_SIZE_THIRTY, loadmoreMediaItemsLiveData)
+
+        val page = when (direction) {
+            FeedLoadDirection.LEFT,
+            FeedLoadDirection.UP -> takeBackwardPage()
+            FeedLoadDirection.RIGHT,
+            FeedLoadDirection.DOWN -> nextForwardPage++
+            FeedLoadDirection.INITIAL -> nextForwardPage++
+        }
+        query(page, direction)
     }
 
+    private fun takeBackwardPage(): Int {
+        val page = nextBackwardPage
+        nextBackwardPage = if (nextBackwardPage > 0) {
+            nextBackwardPage - 1
+        } else {
+            Random.nextInt(0, 100) * 100
+        }
+        return page
+    }
 
     @SuppressLint("UnsafeOptInUsageError")
-    private fun query(page: Int, pageSize: Int, liveData: MutableLiveData<Result<List<MediaItem>>>) {
-        curPageIndex = page
-        var params = MediaLibraryService.LibraryParams.Builder().setExtras(Bundle().apply {
+    private fun query(page: Int, direction: FeedLoadDirection) {
+        feedPageLiveData.postValue(FeedPageEvent(direction, Result.Loading))
+
+        val pageSize = PAGE.PAGE_SIZE_THIRTY
+        val params = MediaLibraryService.LibraryParams.Builder().setExtras(Bundle().apply {
             putString("des", "get album songs")
             putString("action", "feed")
             putInt("offset", page * pageSize)
@@ -61,17 +87,29 @@ class FeedsViewModel(private val browser: MediaBrowser) : ViewModel() {
 
         childrenFuture.addListener(
             {
-                val childrens = childrenFuture.get().value
-                if (childrens.isNullOrEmpty())
-                    liveData.postValue(Result.Error(201, "无数据"))
-                else {
-                    liveData.postValue(
-                        Result.Success(childrens)
-                    )
+                try {
+                    val children = childrenFuture.get().value
+                    if (children.isNullOrEmpty()) {
+                        feedPageLiveData.postValue(FeedPageEvent(direction, Result.Error(201, "无数据")))
+                    } else {
+                        feedPageLiveData.postValue(FeedPageEvent(direction, Result.Success(children)))
+                    }
+                } catch (e: Exception) {
+                    feedPageLiveData.postValue(FeedPageEvent(direction, Result.Error(error = e.message)))
+                } finally {
+                    loadingDirections.remove(direction)
                 }
-                curPageIndex++
             },
-            Executors.newSingleThreadExecutor()
+            queryExecutor
         )
+    }
+
+    fun release() {
+        queryExecutor.shutdownNow()
+    }
+
+    override fun onCleared() {
+        release()
+        super.onCleared()
     }
 }

@@ -3,23 +3,21 @@ package com.dafay.demo.exoplayer.page.main.feeds
 import android.content.ComponentName
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnNextLayout
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.recyclerview.widget.RecyclerView
 import com.arasthel.spannedgridlayoutmanager.SpanSize
 import com.arasthel.spannedgridlayoutmanager.TwoWaySpannedGridLayoutManager
 import com.dafay.demo.data.source.data.Result
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.databinding.FragmentFeedsBinding
 import com.dafay.demo.lab.base.base.BaseFragment
-import com.dafay.demo.lib.base.ui.recy.RecyclerViewInfiniteScrollListener
-import com.dafay.demo.lib.base.utils.HandlerUtils
 import com.dafay.demo.lib.base.utils.debug
 import com.dafay.demo.lib.base.utils.dp2px
 import com.example.demo.biz.base.widgets.GridMarginDecoration
-import com.google.android.material.color.MaterialColors
 import com.google.common.util.concurrent.ListenableFuture
 
 class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::inflate) {
@@ -30,6 +28,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     private lateinit var feedAdapter: FeedAdapter
 
     private lateinit var viewModel: FeedsViewModel
+    private lateinit var spannedGridLayoutManager: TwoWaySpannedGridLayoutManager
     private var observerInitialized = false
     private var initialRefreshRequested = false
 
@@ -45,38 +44,15 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     override fun initViews() {
         super.initViews()
         initRecyclerView()
-
-        binding.srlRefresh.setProgressBackgroundColorSchemeColor(
-            MaterialColors.getColor(
-                requireContext(),
-                com.google.android.material.R.attr.colorOnPrimary,
-                this::class.java.getCanonicalName()
-            )
-        )
-        binding.srlRefresh.setColorSchemeColors(
-            MaterialColors.getColor(
-                requireContext(),
-                com.google.android.material.R.attr.colorPrimary,
-                this::class.java.getCanonicalName()
-            )
-        )
-        binding.srlRefresh.setOnRefreshListener(object : SwipeRefreshLayout.OnRefreshListener {
-            override fun onRefresh() {
-                if (::viewModel.isInitialized) {
-                    viewModel.refresh()
-                } else {
-                    HandlerUtils.mainHandler.postDelayed({
-                        binding.srlRefresh.isRefreshing = false
-                    }, 1000)
-                }
-            }
-        })
     }
 
     private fun initRecyclerView() {
         feedAdapter = FeedAdapter()
-        val spannedGridLayoutManager = TwoWaySpannedGridLayoutManager(visibleSpans = 4, contentSpans = 8)
-        spannedGridLayoutManager.itemOrderIsStable = true
+        spannedGridLayoutManager = TwoWaySpannedGridLayoutManager(
+            visibleSpans = 4,
+            contentSpans = 8,
+            pageSpans = 4
+        )
         binding.rvRecyclerview.addItemDecoration(GridMarginDecoration(4.dp2px, 4.dp2px, 4.dp2px, 4.dp2px))
         binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
         binding.rvRecyclerview.adapter = feedAdapter
@@ -93,9 +69,29 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             }
         }
 
-        binding.rvRecyclerview.addOnScrollListener(object : RecyclerViewInfiniteScrollListener(spannedGridLayoutManager) {
-            override fun onLoadMore() {
-                viewModel.loadMore()
+        binding.rvRecyclerview.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (!::viewModel.isInitialized || feedAdapter.datas.isEmpty()) {
+                    return
+                }
+
+                if (dx > 0 && spannedGridLayoutManager.isNearRightEdge()) {
+                    viewModel.loadMore(FeedLoadDirection.RIGHT)
+                } else if (dx < 0 && spannedGridLayoutManager.isNearLeftEdge()) {
+                    viewModel.loadMore(FeedLoadDirection.LEFT)
+                }
+
+                if (dy > 0 && spannedGridLayoutManager.isNearBottomEdge()) {
+                    viewModel.loadMore(FeedLoadDirection.DOWN)
+                } else if (dy < 0 && spannedGridLayoutManager.isNearTopEdge()) {
+                    viewModel.loadMore(FeedLoadDirection.UP)
+                }
+            }
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    spannedGridLayoutManager.snapToNearestSpan(recyclerView)
+                }
             }
         })
 
@@ -146,26 +142,48 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
         }
         observerInitialized = true
 
-        viewModel.refreshMediaItemsLiveData.observe(viewLifecycleOwner) {
-            if (!(it is Result.Loading)) {
-                binding.srlRefresh.setRefreshing(false)
-            }
-            when (it) {
+        viewModel.feedPageLiveData.observe(viewLifecycleOwner) {
+            when (val result = it.result) {
                 is Result.Loading -> {}
                 is Result.Success -> {
-                    feedAdapter.setDatas(it.value)
+                    applyPage(it.direction, result.value)
                 }
                 else -> {}
             }
         }
+    }
 
-        viewModel.loadmoreMediaItemsLiveData.observe(viewLifecycleOwner){
-            when (it) {
-                is Result.Success -> {
-                    feedAdapter.addDatas(it.value)
+    private fun applyPage(direction: FeedLoadDirection, mediaItems: List<MediaItem>) {
+        when (direction) {
+            FeedLoadDirection.INITIAL -> {
+                feedAdapter.setDatas(mediaItems)
+                binding.rvRecyclerview.doOnNextLayout {
+                    viewModel.loadMore(FeedLoadDirection.UP)
+                    viewModel.loadMore(FeedLoadDirection.LEFT)
                 }
-                else -> {}
             }
+
+            FeedLoadDirection.LEFT,
+            FeedLoadDirection.UP -> {
+                spannedGridLayoutManager.prepareForPrepend(direction.toInsertDirection())
+                feedAdapter.prependDatas(mediaItems)
+            }
+
+            FeedLoadDirection.RIGHT,
+            FeedLoadDirection.DOWN -> {
+                spannedGridLayoutManager.prepareForAppend(direction.toInsertDirection())
+                feedAdapter.addDatas(mediaItems)
+            }
+        }
+    }
+
+    private fun FeedLoadDirection.toInsertDirection(): TwoWaySpannedGridLayoutManager.InsertDirection {
+        return when (this) {
+            FeedLoadDirection.LEFT -> TwoWaySpannedGridLayoutManager.InsertDirection.LEFT
+            FeedLoadDirection.UP -> TwoWaySpannedGridLayoutManager.InsertDirection.UP
+            FeedLoadDirection.RIGHT -> TwoWaySpannedGridLayoutManager.InsertDirection.RIGHT
+            FeedLoadDirection.DOWN,
+            FeedLoadDirection.INITIAL -> TwoWaySpannedGridLayoutManager.InsertDirection.DOWN
         }
     }
 
@@ -179,6 +197,9 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     }
 
     override fun onDestroy() {
+        if (::viewModel.isInitialized) {
+            viewModel.release()
+        }
         if (::browserFuture.isInitialized) {
             MediaBrowser.releaseFuture(browserFuture)
         }
