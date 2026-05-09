@@ -16,12 +16,16 @@
 
     <string name="color_theme">Theme color</string>
     <string name="vibrator_mode">Vibrator</string>
-    <string name="system_haptics_turnedoff">System haptics turnedoff</string>
+    <string name="system_haptics_turnedoff">System haptics turned off</string>
 
     <string name="picture_quality">Picture quality</string>
     <string name="clear_cache">Clear cache</string>
     <string name="app_version">Version</string>
     <string name="developer">Developer</string>
+    <string name="developer_name">dafay</string>
+    <string name="developer_other_apps">Developer apps</string>
+    <string name="google_play">Google Play</string>
+    <string name="user_agreement">User agreement</string>
     <string name="privacy_policy">Privacy policy</string>
     <string name="turned_on">Turned on</string>
     <string name="turned_off">Turned off</string>
@@ -52,10 +56,19 @@
     <string name="raw">Raw</string>
     <string name="full">Full</string>
     <string name="regular">Regular</string>
-    <string name="samll">Samll</string>
+    <string name="samll">Small</string>
     <string name="thumb">Thumb</string>
 
-
-
+    <string name="recommend">Recommend</string>
+    <string name="wallpaper">Wallpaper</string>
+    <string name="downloading">Downloading…</string>
+    <string name="setting_up">Setting up…</string>
+    <string name="wallpaper_settings_success">Wallpaper set successfully</string>
+    <string name="wallpaper_settings_failed">Failed to set wallpaper</string>
+    <string name="image_saved_success">Image saved</string>
+    <string name="image_saved_failed">Failed to save image</string>
+    <string name="no_data">Daily request limit reached</string>
+    <string name="tip_no_net">Connect to the network and try again</string>
+    <string name="select_dark_mode">Choose dark mode</string>
 
 </resources>

@@ -16,13 +16,9 @@ import com.google.android.material.color.MaterialColors
  * @Author dafay
  * @Date 2024/1/17
  */
-class PictureQualityAdapter : BaseAdapter<PhotoQuality> {
+class PictureQualityAdapter(passPhotoQualityType: PhotoQualityType) : BaseAdapter<PhotoQuality>() {
     var onItemClickListener: PhotoQualityViewHolder.OnItemClickListener? = null
-    var curPhotoQualityType: PhotoQualityType = PhotoQualityType.REGULAR
-
-    constructor(passPhotoQualityType: PhotoQualityType) : super() {
-        this.curPhotoQualityType = passPhotoQualityType
-    }
+    var curPhotoQualityType: PhotoQualityType = passPhotoQualityType
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return PhotoQualityViewHolder(ItemLanguageBinding.inflate(LayoutInflater.from(parent.context)))
@@ -48,7 +44,7 @@ class PictureQualityAdapter : BaseAdapter<PhotoQuality> {
             selectedPhotoQualityType: PhotoQualityType
         ) {
             binding.uvItem.binding.apply {
-                tvTitle.text =binding.root.context.getString(photoQuality.qualityType.nameResId)
+                tvTitle.text = binding.root.context.getString(photoQuality.qualityType.nameResId)
                 tvDes.visibility = View.GONE
                 mcvCard.setCardBackgroundColor(Color.TRANSPARENT)
                 mcvCard.setOnClickListener {
@@ -56,7 +52,13 @@ class PictureQualityAdapter : BaseAdapter<PhotoQuality> {
                 }
                 if (selectedPhotoQualityType == photoQuality.qualityType) {
                     ivIcon.visibility = View.VISIBLE
-                    mcvCard.setCardBackgroundColor(MaterialColors.getColor(mcvCard.context,com.google.android.material.R.attr.colorSurfaceContainerHigh, this::class.java.getCanonicalName()))
+                    mcvCard.setCardBackgroundColor(
+                        MaterialColors.getColor(
+                            mcvCard.context,
+                            com.google.android.material.R.attr.colorSurfaceContainerHigh,
+                            PhotoQualityViewHolder::class.java.canonicalName
+                        )
+                    )
                 } else {
                     ivIcon.visibility = View.INVISIBLE
                     mcvCard.setCardBackgroundColor(Color.TRANSPARENT)

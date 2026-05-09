@@ -7,8 +7,8 @@ import androidx.viewbinding.ViewBinding
 import com.dafay.demo.biz.settings.COLOR_THEME
 import com.dafay.demo.biz.settings.PrefC
 import com.dafay.demo.biz.settings.helper.ThemeHelper
-import com.dafay.demo.lab.base.base.BaseActivity
-import com.example.demo.biz.base.storage.sp.SPUtils
+import com.dafay.demo.lib.base.base.BaseActivity
+import com.dafay.demo.lib.base.storage.sp.SPUtils
 
 /**
  * @Des

@@ -10,7 +10,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.MediaLibraryService
 import com.dafay.demo.data.source.data.Result
-import com.example.demo.meetsplash.data.model.PAGE
+import com.dafay.demo.data.source.data.model.PAGE
 import java.util.ArrayDeque
 import java.util.concurrent.Executors
 import kotlin.math.max

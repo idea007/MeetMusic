@@ -17,11 +17,11 @@ import com.google.android.material.color.MaterialColors
  * @Author dafay
  * @Date 2024/1/17
  */
-class LauguageAdapter : BaseAdapter<Language> {
+class LanguageAdapter : BaseAdapter<Language>() {
     var currentSelectedCode: String? = null
     var onItemClickListener: LanguageViewHolder.OnItemClickListener? = null
 
-    constructor() : super() {
+    init {
         currentSelectedCode = LocaleUtils.getLanguageCode(AppCompatDelegate.getApplicationLocales())
     }
 
@@ -33,14 +33,7 @@ class LauguageAdapter : BaseAdapter<Language> {
         (holder as LanguageViewHolder).onBindViewHolder(position, datas[position], onItemClickListener, currentSelectedCode)
     }
 
-
-    class LanguageViewHolder : RecyclerView.ViewHolder {
-
-        val binding: ItemLanguageBinding
-
-        constructor(itemView: ItemLanguageBinding) : super(itemView.root) {
-            binding = itemView
-        }
+    class LanguageViewHolder(private val binding: ItemLanguageBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBindViewHolder(position: Int, language: Language, onItemClickListener: OnItemClickListener?, selectedCode: String?) {
             binding.uvItem.binding.apply {
@@ -57,18 +50,22 @@ class LauguageAdapter : BaseAdapter<Language> {
                 }
                 if (selectedCode == language.code) {
                     ivIcon.visibility = View.VISIBLE
-                    mcvCard.setCardBackgroundColor(MaterialColors.getColor(mcvCard.context,com.google.android.material.R.attr.colorSurfaceContainerHigh, this::class.java.getCanonicalName()))
+                    mcvCard.setCardBackgroundColor(
+                        MaterialColors.getColor(
+                            mcvCard.context,
+                            com.google.android.material.R.attr.colorSurfaceContainerHigh,
+                            LanguageViewHolder::class.java.canonicalName
+                        )
+                    )
                 } else {
                     ivIcon.visibility = View.INVISIBLE
                     mcvCard.setCardBackgroundColor(Color.TRANSPARENT)
                 }
             }
-
         }
 
         interface OnItemClickListener {
             fun onClickItem(view: View, position: Int, language: Language)
         }
     }
-
 }

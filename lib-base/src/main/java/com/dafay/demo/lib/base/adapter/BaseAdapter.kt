@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 
-open abstract class BaseAdapter<T> : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+abstract class BaseAdapter<T> : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     val datas = ArrayList<T>()
 
     abstract override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder

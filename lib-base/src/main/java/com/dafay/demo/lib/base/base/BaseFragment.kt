@@ -1,4 +1,4 @@
-package com.dafay.demo.lab.base.base
+package com.dafay.demo.lib.base.base
 
 import android.os.Bundle
 import android.view.LayoutInflater

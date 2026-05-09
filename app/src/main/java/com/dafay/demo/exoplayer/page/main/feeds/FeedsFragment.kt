@@ -18,17 +18,23 @@ import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.databinding.FragmentFeedsBinding
 import com.dafay.demo.exoplayer.page.player.NowPlayingActivity
 import com.dafay.demo.exoplayer.ui.PlayingBarsDrawable
-import com.dafay.demo.lab.base.base.BaseFragment
+import com.dafay.demo.lib.base.base.BaseFragment
+import com.dafay.demo.lib.base.ui.itemdecoration.GridMarginDecoration
 import com.dafay.demo.lib.base.utils.debug
 import com.dafay.demo.lib.base.utils.dp2px
-import com.example.demo.biz.base.widgets.GridMarginDecoration
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.android.material.color.MaterialColors
 
 class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::inflate) {
 
     private lateinit var browserFuture: ListenableFuture<MediaBrowser>
-    private val browser: MediaBrowser? get() = if (browserFuture.isDone && !browserFuture.isCancelled) browserFuture.get() else null
+    private val browser: MediaBrowser?
+        get() {
+            if (!::browserFuture.isInitialized || !browserFuture.isDone || browserFuture.isCancelled) {
+                return null
+            }
+            return runCatching { browserFuture.get() }.getOrNull()
+        }
 
     private lateinit var feedAdapter: FeedAdapter
     private val playingBarsDrawable = PlayingBarsDrawable()
@@ -174,6 +180,9 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             SessionToken(requireContext(), ComponentName(requireContext(), PlaybackService::class.java))
         ).buildAsync()
         browserFuture.addListener({
+            if (view == null) {
+                return@addListener
+            }
             debug("initializeBrowser success")
             val mediaBrowser = browser ?: return@addListener
             viewModel = FeedsViewModel(mediaBrowser)

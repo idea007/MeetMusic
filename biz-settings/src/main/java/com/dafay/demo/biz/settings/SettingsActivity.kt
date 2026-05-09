@@ -34,7 +34,7 @@ import com.dafay.demo.biz.settings.webview.WebViewActivity
 import com.dafay.demo.lib.base.utils.AppUtils
 import com.dafay.demo.lib.base.utils.RxBus
 import com.dafay.demo.lib.base.utils.VibratorManager
-import com.example.demo.biz.base.storage.sp.SPUtils
+import com.dafay.demo.lib.base.storage.sp.SPUtils
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.color.utilities.Hct
 import com.google.android.material.divider.MaterialDivider
@@ -230,19 +230,19 @@ class SettingsActivity : BaseThemeActivity<ActivitySettingsBinding>(ActivitySett
         binding.itemDeveloper.apply {
             binding.ivIcon.setImageResource(R.drawable.vector_person_24dp)
             binding.tvTitle.text = context.getString(R.string.developer)
-            binding.tvDes.text = "dafay"
+            binding.tvDes.text = context.getString(R.string.developer_name)
             binding.mcvCard.setOnClickListener {}
         }
 
         binding.itemOtherApp.apply {
-            binding.tvTitle.text = "开发者别的 App"
-            binding.tvDes.text = "google play"
+            binding.tvTitle.text = context.getString(R.string.developer_other_apps)
+            binding.tvDes.text = context.getString(R.string.google_play)
             binding.ivIcon.setImageResource(R.drawable.vector_storefront_24dp)
             binding.mcvCard.setOnClickListener {}
         }
 
         binding.itemAgreement.apply {
-            binding.tvTitle.text = "用户协议"
+            binding.tvTitle.text = context.getString(R.string.user_agreement)
             binding.tvDes.visibility = View.GONE
             binding.ivIcon.setImageResource(R.drawable.vector_developer_guide_24dp)
             binding.mcvCard.setOnClickListener {}
@@ -323,7 +323,7 @@ class SettingsActivity : BaseThemeActivity<ActivitySettingsBinding>(ActivitySett
                 getColorRole(colorTheme.color, 70)
             }
             card.setCardBackgroundColor(color)
-            card.setOnClickListener { v ->
+            card.setOnClickListener {
                 if (!card.isChecked()) {
                     card.startCheckedIcon()
                     ViewUtil.uncheckAllChildren(container)

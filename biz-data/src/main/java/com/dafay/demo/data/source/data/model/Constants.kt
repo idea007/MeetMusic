@@ -1,4 +1,4 @@
-package com.example.demo.meetsplash.data.model
+package com.dafay.demo.data.source.data.model
 
 /**
  * 配置参数
@@ -14,4 +14,3 @@ object PAGE {
     val PAGE_SIZE_THIRTY = 30
     val PAGE_SIZE_FIFTY = 50
 }
-

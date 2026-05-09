@@ -39,6 +39,10 @@
     <string name="clear_cache">清除缓存</string>
     <string name="app_version">版本</string>
     <string name="developer">开发者</string>
+    <string name="developer_name">dafay</string>
+    <string name="developer_other_apps">开发者别的 App</string>
+    <string name="google_play">google play</string>
+    <string name="user_agreement">用户协议</string>
     <string name="privacy_policy">隐私政策</string>
     <string name="turned_on">开启</string>
     <string name="turned_off">关闭</string>
@@ -78,8 +82,8 @@
     <string name="thumb">缩略图</string>
 
 
-    <string name="downloading">下载中...</string>
-    <string name="setting_up">设置中...</string>
+    <string name="downloading">下载中…</string>
+    <string name="setting_up">设置中…</string>
     <string name="wallpaper_settings_success">壁纸设置成功</string>
     <string name="wallpaper_settings_failed">壁纸设置失败</string>
     <string name="image_saved_success">图片下载成功</string>
@@ -87,4 +91,5 @@
 
     <string name="no_data">请求已达到今日限制</string>
     <string name="tip_no_net">请在联网后重试</string>
+    <string name="select_dark_mode">选择夜间模式</string>
 </resources>

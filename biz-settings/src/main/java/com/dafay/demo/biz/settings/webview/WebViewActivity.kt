@@ -37,7 +37,7 @@ class WebViewActivity : BaseThemeActivity<ActivityWebViewBinding>(ActivityWebVie
     override fun initViews() {
         super.initViews()
         initToolBar()
-        initVebView()
+        initWebView()
     }
 
     private fun initToolBar() {
@@ -50,7 +50,7 @@ class WebViewActivity : BaseThemeActivity<ActivityWebViewBinding>(ActivityWebVie
         supportActionBar?.title = passUrl
     }
 
-    private fun initVebView() {
+    private fun initWebView() {
         binding.wvWebview.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView,

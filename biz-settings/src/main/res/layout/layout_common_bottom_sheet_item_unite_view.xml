@@ -43,8 +43,8 @@
                     android:id="@+id/tv_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="夜间模式"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    tools:text="夜间模式" />
 
                 <TextView
                     android:id="@+id/tv_des"
@@ -53,8 +53,8 @@
                     android:layout_below="@+id/tv_title"
                     android:layout_marginTop="4dp"
                     android:alpha="0.6"
-                    android:text="亮色"
-                    android:textAppearance="?attr/textAppearanceBodySmall" />
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="亮色" />
 
             </RelativeLayout>
 

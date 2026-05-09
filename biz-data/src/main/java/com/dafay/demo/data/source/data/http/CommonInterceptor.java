@@ -1,6 +1,6 @@
 package com.dafay.demo.data.source.data.http;
 
-import com.example.demo.meetsplash.data.model.ConfigC;
+import com.dafay.demo.data.source.data.model.ConfigC;
 
 import java.io.IOException;
 

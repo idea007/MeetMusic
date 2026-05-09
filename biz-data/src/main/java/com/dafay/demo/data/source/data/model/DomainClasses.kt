@@ -1,4 +1,4 @@
-package com.example.demo.meetsplash.data.model
+package com.dafay.demo.data.source.data.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
@@ -41,5 +41,4 @@ data class Track(
     val audiodownload_allowed: Boolean,
     val duration: Int,
 ) : Parcelable
-
 

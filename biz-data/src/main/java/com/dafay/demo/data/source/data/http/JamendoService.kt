@@ -1,6 +1,6 @@
-package com.example.demo.meetsplash.data.http
+package com.dafay.demo.data.source.data.http
 
-import com.example.demo.meetsplash.data.model.Tracks
+import com.dafay.demo.data.source.data.model.Tracks
 import io.reactivex.Observable
 import retrofit2.http.GET
 import retrofit2.http.Query

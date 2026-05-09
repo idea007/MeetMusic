@@ -9,7 +9,7 @@ import com.dafay.demo.biz.settings.PhotoQuality
 import com.dafay.demo.biz.settings.PhotoQualityType
 import com.dafay.demo.biz.settings.PrefC
 import com.dafay.demo.biz.settings.databinding.FragmentBottomSheetSelectPictureQualityBinding
-import com.example.demo.biz.base.storage.sp.SPUtils
+import com.dafay.demo.lib.base.storage.sp.SPUtils
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
@@ -47,8 +47,14 @@ class SelectPictureQualityBottomSheetDialogFragment : BottomSheetDialogFragment 
         pictureQualityAdapter.onItemClickListener = object : PictureQualityAdapter.PhotoQualityViewHolder.OnItemClickListener {
             override fun onClickItem(view: View, position: Int, photoQuality: PhotoQuality) {
                 if (SPUtils.findPreference(PrefC.PHOTO_QUALITY_DOWNLAOD, PhotoQualityType.REGULAR.key) != photoQuality.qualityType.key) {
+                    val previousPosition = pictureQualityAdapter.datas.indexOfFirst {
+                        it.qualityType == pictureQualityAdapter.curPhotoQualityType
+                    }
                     pictureQualityAdapter.curPhotoQualityType = photoQuality.qualityType
-                    pictureQualityAdapter.notifyDataSetChanged()
+                    if (previousPosition != -1) {
+                        pictureQualityAdapter.notifyItemChanged(previousPosition)
+                    }
+                    pictureQualityAdapter.notifyItemChanged(position)
                     SPUtils.putPreference(PrefC.PHOTO_QUALITY_DOWNLAOD, photoQuality.qualityType.key)
                     callback?.onQualityChange(photoQuality.qualityType)
                 }

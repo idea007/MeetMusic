@@ -1,5 +1,4 @@
-package com.example.demo.biz.base.storage.sp
-
+package com.dafay.demo.lib.base.storage.sp
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -34,7 +33,7 @@ class Preference<T> {
     }
 
     @Suppress("UNCHECKED_CAST")
-    public fun findPreference(name: String, default: T): T = with(prefs) {
+    fun findPreference(name: String, default: T): T = with(prefs) {
         val res: Any? = when (default) {
             is Long -> getLong(name, default)
             is String -> getString(name, default)
@@ -48,7 +47,7 @@ class Preference<T> {
     }
 
     @SuppressLint("CommitPrefEdits")
-    public fun putPreference(name: String, value: T) = with(prefs.edit()) {
+    fun putPreference(name: String, value: T) = with(prefs.edit()) {
         when (value) {
             is Long -> putLong(name, value)
             is String -> putString(name, value)

@@ -20,13 +20,5 @@ class NewHomeActivity : BaseThemeActivity<ActivityNewHomeBinding>(ActivityNewHom
                 replace(R.id.fl_container, FeedsFragment())
                 commit()
             }
-
-//        supportFragmentManager.beginTransaction().apply {
-//            replace(R.id.fl_bottom_controls, BottomControlsFragment())
-//            addToBackStack(null)
-//            commit()
-//        }
     }
-
-
 }
