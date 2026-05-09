@@ -1,4 +1,27 @@
-.gradle
-.idea
-**/build
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Gradle / Android build outputs
+.gradle/
+/build/
+**/build/
+.externalNativeBuild/
+.cxx/
+captures/
+*.hprof
+
+# Local machine config
+local.properties
+
+# Generated packages and release artifacts
+*.apk
+*.ap_
+*.aab
+*.aar
+apk
