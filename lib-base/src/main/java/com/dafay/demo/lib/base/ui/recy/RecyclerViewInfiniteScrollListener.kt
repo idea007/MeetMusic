@@ -1,11 +1,11 @@
 package com.dafay.demo.lib.base.ui.recy
 
-import android.text.Spanned
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.arasthel.spannedgridlayoutmanager.SpannedGridLayoutManager
+import com.arasthel.spannedgridlayoutmanager.TwoWaySpannedGridLayoutManager
 
 /**
  * A scroll listener for RecyclerView to load more items as you approach the end.
@@ -56,7 +56,7 @@ abstract class RecyclerViewInfiniteScrollListener(private val layoutManager: Rec
             if (totalItemCount - visibleItemCount <= firstVisibleItem + VISIBLE_THRESHOLD) {
                 recyclerView.post(loadMoreRunnable)
             }
-         } else if(layoutManager is SpannedGridLayoutManager){
+        } else if (layoutManager is SpannedGridLayoutManager) {
             visibleItemCount = recyclerView.childCount
             totalItemCount = layoutManager.itemCount
             firstVisibleItem = layoutManager.firstVisiblePosition
@@ -64,9 +64,15 @@ abstract class RecyclerViewInfiniteScrollListener(private val layoutManager: Rec
             if (totalItemCount - visibleItemCount <= firstVisibleItem + VISIBLE_THRESHOLD) {
                 recyclerView.post(loadMoreRunnable)
             }
-        }
+        } else if (layoutManager is TwoWaySpannedGridLayoutManager) {
+            if (dy <= 0) return
 
-        else {
+            totalItemCount = layoutManager.itemCount
+
+            if (layoutManager.lastVisiblePosition >= totalItemCount - VISIBLE_THRESHOLD) {
+                recyclerView.post(loadMoreRunnable)
+            }
+        } else {
             throw RuntimeException(
                     "Unsupported LayoutManager used. Valid ones are LinearLayoutManager, GridLayoutManager and StaggeredGridLayoutManager");
         }

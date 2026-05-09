@@ -9,7 +9,7 @@ import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.arasthel.spannedgridlayoutmanager.SpanSize
-import com.arasthel.spannedgridlayoutmanager.SpannedGridLayoutManager
+import com.arasthel.spannedgridlayoutmanager.TwoWaySpannedGridLayoutManager
 import com.dafay.demo.data.source.data.Result
 import com.dafay.demo.exoplayer.PlaybackService
 import com.dafay.demo.exoplayer.databinding.FragmentFeedsBinding
@@ -30,10 +30,16 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     private lateinit var feedAdapter: FeedAdapter
 
     private lateinit var viewModel: FeedsViewModel
+    private var observerInitialized = false
+    private var initialRefreshRequested = false
 
     override fun onStart() {
         super.onStart()
-        initializeBrowser()
+        if (::viewModel.isInitialized) {
+            delayInitObserver()
+        } else {
+            initializeBrowser()
+        }
     }
 
     override fun initViews() {
@@ -69,13 +75,13 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
 
     private fun initRecyclerView() {
         feedAdapter = FeedAdapter()
-        val spannedGridLayoutManager = SpannedGridLayoutManager(orientation = SpannedGridLayoutManager.Orientation.VERTICAL, spans = 4)
+        val spannedGridLayoutManager = TwoWaySpannedGridLayoutManager(visibleSpans = 4, contentSpans = 8)
         spannedGridLayoutManager.itemOrderIsStable = true
         binding.rvRecyclerview.addItemDecoration(GridMarginDecoration(4.dp2px, 4.dp2px, 4.dp2px, 4.dp2px))
         binding.rvRecyclerview.layoutManager = spannedGridLayoutManager
         binding.rvRecyclerview.adapter = feedAdapter
 
-        spannedGridLayoutManager.spanSizeLookup = SpannedGridLayoutManager.SpanSizeLookup { position ->
+        spannedGridLayoutManager.spanSizeLookup = TwoWaySpannedGridLayoutManager.SpanSizeLookup { position ->
             when (position % 4) {
                 0 -> {
                     SpanSize(2, 2)
@@ -117,20 +123,30 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
     }
 
     private fun initializeBrowser() {
+        if (::browserFuture.isInitialized) {
+            return
+        }
+
         browserFuture = MediaBrowser.Builder(
             requireContext(),
             SessionToken(requireContext(), ComponentName(requireContext(), PlaybackService::class.java))
         ).buildAsync()
         browserFuture.addListener({
             debug("initializeBrowser success")
-            viewModel = FeedsViewModel(browser!!)
+            val mediaBrowser = browser ?: return@addListener
+            viewModel = FeedsViewModel(mediaBrowser)
             delayInitObserver()
-            viewModel.refresh()
+            refreshInitialDataIfNeeded()
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
     private fun delayInitObserver() {
-        viewModel.refreshMediaItemsLiveData.observe(this) {
+        if (observerInitialized) {
+            return
+        }
+        observerInitialized = true
+
+        viewModel.refreshMediaItemsLiveData.observe(viewLifecycleOwner) {
             if (!(it is Result.Loading)) {
                 binding.srlRefresh.setRefreshing(false)
             }
@@ -143,7 +159,7 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
             }
         }
 
-        viewModel.loadmoreMediaItemsLiveData.observe(this){
+        viewModel.loadmoreMediaItemsLiveData.observe(viewLifecycleOwner){
             when (it) {
                 is Result.Success -> {
                     feedAdapter.addDatas(it.value)
@@ -151,5 +167,26 @@ class FeedsFragment : BaseFragment<FragmentFeedsBinding>(FragmentFeedsBinding::i
                 else -> {}
             }
         }
+    }
+
+    private fun refreshInitialDataIfNeeded() {
+        if (initialRefreshRequested || feedAdapter.datas.isNotEmpty()) {
+            return
+        }
+
+        initialRefreshRequested = true
+        viewModel.refresh()
+    }
+
+    override fun onDestroy() {
+        if (::browserFuture.isInitialized) {
+            MediaBrowser.releaseFuture(browserFuture)
+        }
+        super.onDestroy()
+    }
+
+    override fun onDestroyView() {
+        observerInitialized = false
+        super.onDestroyView()
     }
 }
