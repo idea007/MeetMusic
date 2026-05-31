@@ -13,6 +13,10 @@
 </p>
 
 <p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <a href="#demo">Demo</a> ·
   <a href="#features">Features</a> ·
   <a href="#architecture">Architecture</a> ·
@@ -20,7 +24,7 @@
   <a href="#roadmap">Roadmap</a>
 </p>
 
-MeetMusic 是一个基于 Kotlin 与 AndroidX Media3 的 Android 音乐播放器示例项目。它把在线音乐流、MediaLibrarySession、前台播放服务、播放页频谱可视化、Material 风格设置页和模块化工程结构放在一起，适合作为学习 Media3 播放链路、音乐 App 架构拆分和自定义音频处理的参考。
+MeetMusic is an Android music player sample built with Kotlin and AndroidX Media3. It brings together online music streaming, `MediaLibrarySession`, foreground playback, FFT-based audio visualization, a Material-style settings experience, and a modular Android project structure. It is designed as a practical reference for learning Media3 playback flows, music app architecture, and custom audio processing.
 
 ## Demo
 
@@ -46,14 +50,14 @@ MeetMusic 是一个基于 Kotlin 与 AndroidX Media3 的 Android 音乐播放器
 
 ## Features
 
-- Two-way feed: 首页使用自定义双向 Spanned Grid，支持横向、纵向边缘加载和空白预取。
-- Online music source: 通过 Jamendo API 拉取音乐、封面、艺术家和播放地址。
-- Media3 playback core: 基于 `MediaLibraryService`、`MediaLibrarySession`、`MediaBrowser` 和 `MediaController` 组织播放链路。
-- Background playback: 支持前台播放服务、媒体通知、播放队列、上一首/下一首和随机播放命令。
-- Now Playing page: 播放页包含封面、曲名、艺术家、进度条、播放控制和 FFT 频谱视图。
-- Audio visualization: 自定义 `FFTAudioProcessor` 从 PCM 音频中提取频域数据，再通过 AIDL 回传给 UI。
-- Personalization: 设置页支持语言、深色模式、Material 动态色/主题色、首页跨数、振动和缓存清理。
-- Modular Android project: UI、播放服务、数据源、设置页、网络层和通用工具分别拆分为独立模块。
+- Two-way feed: a custom two-way spanned grid on the home screen with horizontal and vertical edge loading plus blank-space prefetching.
+- Online music source: fetches tracks, covers, artists, and stream URLs from the Jamendo API.
+- Media3 playback core: organizes playback with `MediaLibraryService`, `MediaLibrarySession`, `MediaBrowser`, and `MediaController`.
+- Background playback: supports foreground media playback, media notifications, playback queues, previous/next controls, and shuffle commands.
+- Now Playing page: includes cover art, title, artist, seek bar, transport controls, and an FFT spectrum view.
+- Audio visualization: a custom `FFTAudioProcessor` extracts frequency-domain data from PCM audio and sends it back to the UI through AIDL.
+- Personalization: settings for language, dark mode, Material dynamic color/theme color, home feed spans, haptics, and cache clearing.
+- Modular Android project: app UI, playback service, data source, settings, networking, and common utilities are split into focused modules.
 
 ## Architecture
 
@@ -126,27 +130,27 @@ cd MeetMusic
 ./gradlew :app:installDebug
 ```
 
-也可以直接用 Android Studio 打开项目，选择 `app` 运行配置后安装到设备。
+You can also open the project directly in Android Studio, select the `app` run configuration, and install it on a device.
 
 ## Configuration
 
-项目当前使用 Jamendo 作为在线音乐数据源，基础地址在 `DemoPlaybackService` 中初始化，客户端参数在 `biz-data` 模块的 `ConfigC` 中维护。对外发布前建议把 API 配置迁移到本地配置、构建变量或服务端代理，避免把生产密钥直接写入源码。
+MeetMusic currently uses Jamendo as its online music source. The base URL is initialized in `DemoPlaybackService`, and the client parameter is maintained in `ConfigC` inside the `biz-data` module. Before publishing a production build, move API configuration to local config, build variables, or a backend proxy to avoid keeping production keys in source code.
 
 ## Permissions
 
 | Permission | Why |
 | --- | --- |
-| `INTERNET` | 拉取音乐列表、音频流和封面 |
-| `FOREGROUND_SERVICE` | 后台播放时维持播放服务 |
-| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Android 14+ 媒体播放前台服务类型 |
-| `RECORD_AUDIO` | 音频可视化/频谱相关能力 |
+| `INTERNET` | Fetch music lists, audio streams, and cover images |
+| `FOREGROUND_SERVICE` | Keep playback alive in a foreground service |
+| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Declare the Android 14+ media playback foreground service type |
+| `RECORD_AUDIO` | Support audio visualization and spectrum-related capabilities |
 
 ## Development Notes
 
-- 首页分页由 `FeedsViewModel` 维护缓存队列和预取请求，避免滚动到边缘时出现明显空白。
-- `DemoMediaLibrarySessionCallback` 负责把 Jamendo 数据转成 Media3 `MediaItem`，并处理媒体控制器的播放列表解析。
-- `FFTAudioProcessor` 插入 ExoPlayer 音频渲染链路，保留原音频输出，同时生成 FFT 数据供 UI 展示。
-- 设置页通过 `SPUtils` 保存偏好，并使用 `RxBus` 通知主题等全局变化。
+- `FeedsViewModel` maintains cached pages and prefetch requests to reduce visible blank space near scroll edges.
+- `DemoMediaLibrarySessionCallback` converts Jamendo data into Media3 `MediaItem` objects and resolves playlists for media controllers.
+- `FFTAudioProcessor` is inserted into the ExoPlayer audio rendering chain to preserve audio output while producing FFT data for the UI.
+- The settings module stores preferences with `SPUtils` and broadcasts global changes, such as theme updates, through `RxBus`.
 
 ## Roadmap
 
