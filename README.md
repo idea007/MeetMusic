@@ -9,7 +9,7 @@
   <a href="https://developer.android.com"><img alt="Android" src="https://img.shields.io/badge/Android-SDK%2034-3DDC84?logo=android&logoColor=white"></a>
   <a href="https://developer.android.com/media/media3"><img alt="Media3" src="https://img.shields.io/badge/Media3-ExoPlayer-4285F4"></a>
   <img alt="Min SDK" src="https://img.shields.io/badge/minSdk-21-blue">
-  <img alt="License" src="https://img.shields.io/badge/license-TBD-lightgrey">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue"></a>
 </p>
 
 <p align="center">
@@ -154,7 +154,6 @@ cd MeetMusic
 - Add unit tests for feed prefetching and media item conversion.
 - Move API keys and remote config out of source code.
 - Add app screenshots and Play Store style release notes.
-- Add a formal open-source license before public distribution.
 
 ## Acknowledgements
 
@@ -166,4 +165,6 @@ cd MeetMusic
 
 ## License
 
-This repository does not declare a license yet. Add a `LICENSE` file before publishing it as an open-source project.
+This project is licensed under the GNU General Public License v3.0 or later. See [LICENSE](LICENSE) for details.
+
+Some files retain their original upstream license headers, including Android Open Source Project Apache-2.0 snippets and GPL-licensed components. Keep those notices intact when redistributing or modifying the project.
