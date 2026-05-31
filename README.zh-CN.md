@@ -50,7 +50,7 @@ MeetMusic 是一个基于 Kotlin 与 AndroidX Media3 的 Android 音乐播放器
 
 ## 功能特性
 
-- 双向首页流：首页使用自定义双向 Spanned Grid，支持横向、纵向边缘加载和空白预取。
+- 不限方向首页流：首页使用自定义 Spanned Grid，滚动方向不受限制，支持任意方向的边缘加载和空白预取。
 - 在线音乐源：通过 Jamendo API 拉取音乐、封面、艺术家和播放地址。
 - Media3 播放核心：基于 `MediaLibraryService`、`MediaLibrarySession`、`MediaBrowser` 和 `MediaController` 组织播放链路。
 - 后台播放：支持前台播放服务、媒体通知、播放队列、上一首/下一首和随机播放命令。

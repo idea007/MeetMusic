@@ -50,7 +50,7 @@ MeetMusic is an Android music player sample built with Kotlin and AndroidX Media
 
 ## Features
 
-- Two-way feed: a custom two-way spanned grid on the home screen with horizontal and vertical edge loading plus blank-space prefetching.
+- Direction-free feed: a custom spanned grid on the home screen with unrestricted directional scrolling, edge loading, and blank-space prefetching.
 - Online music source: fetches tracks, covers, artists, and stream URLs from the Jamendo API.
 - Media3 playback core: organizes playback with `MediaLibraryService`, `MediaLibrarySession`, `MediaBrowser`, and `MediaController`.
 - Background playback: supports foreground media playback, media notifications, playback queues, previous/next controls, and shuffle commands.
