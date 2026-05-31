@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#preview">Preview</a> ·
+  <a href="#demo">Demo</a> ·
   <a href="#features">Features</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#quick-start">Quick Start</a> ·
@@ -22,13 +22,27 @@
 
 MeetMusic 是一个基于 Kotlin 与 AndroidX Media3 的 Android 音乐播放器示例项目。它把在线音乐流、MediaLibrarySession、前台播放服务、播放页频谱可视化、Material 风格设置页和模块化工程结构放在一起，适合作为学习 Media3 播放链路、音乐 App 架构拆分和自定义音频处理的参考。
 
-## Preview
+## Demo
 
-<p align="center">
-  <video src="docs/assets/meetmusic-preview.mp4" poster="docs/assets/meetmusic-preview-poster.jpg" controls width="320"></video>
-</p>
-
-如果当前 Markdown 环境没有直接渲染视频，可以打开 [docs/assets/meetmusic-preview.mp4](docs/assets/meetmusic-preview.mp4) 查看完整预览。
+<table>
+  <thead>
+    <tr>
+      <th>Android demo</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center">
+        <a href="docs/assets/meetmusic-preview.mp4">
+          <img src="docs/assets/meetmusic-preview.gif" alt="MeetMusic preview" width="320">
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="docs/assets/meetmusic-preview.mp4">MP4</a></td>
+    </tr>
+  </tbody>
+</table>
 
 ## Features
 
